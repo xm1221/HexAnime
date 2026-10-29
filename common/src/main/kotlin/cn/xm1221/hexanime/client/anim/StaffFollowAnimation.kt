@@ -18,10 +18,12 @@ import net.minecraft.world.InteractionHand
  * `Math.toRadians` before adding it). The pose replaces the vanilla arm swing while the weight is 1,
  * and lerps back to it while fading out.
  *
- * First person is left on [FirstPersonMode.NONE]: the spell grid is a full-screen GUI, and
- * [FirstPersonMode.THIRD_PERSON_MODEL] would draw the third-person arm over it. The local player's
- * own body in third person still uses this layer, because the factory is registered for every
- * [AbstractClientPlayer].
+ * First person stays on [FirstPersonMode.NONE]. playerAnimator's vanilla and third-person-model
+ * modes would replace this pose (absolute third-person arm angles) onto the first-person model, or
+ * cancel the vanilla hands. The held staff in first person is the vanilla item pose, so
+ * [cn.xm1221.hexanime.client.StaffFirstPerson] rotates that pose in view space instead. That pass
+ * runs with the world, before the spell GUI, so the grid stays on top. Third person, including the
+ * local player, still uses this layer.
  */
 class StaffArmAimAnimation(
     private val player: AbstractClientPlayer,
@@ -67,21 +69,28 @@ class StaffArmAimAnimation(
 
     override fun setupAnim(tickDelta: Float) {}
 
+    /** Smoothed cursor and fade, for the third-person bones and the first-person hand pose. */
+    fun frame(tickDelta: Float): AimFrame {
+        return AimFrame(
+            Mth.lerp(tickDelta, prevX, shownX),
+            Mth.lerp(tickDelta, prevY, shownY),
+            Mth.lerp(tickDelta, prevWeight, weight),
+        )
+    }
+
     override fun get3DTransform(modelName: String, type: TransformType, tickDelta: Float, value0: Vec3f): Vec3f {
         if (type != TransformType.ROTATION) return value0
         val arm = Staffs.armBone(player, hand)
         if (modelName != arm && modelName != Staffs.itemBone(arm)) return value0
 
-        val w = Mth.lerp(tickDelta, prevWeight, weight)
-        if (w <= 0.001f) return value0
+        val frame = frame(tickDelta)
+        if (frame.weight <= 0.001f) return value0
 
-        val nx = Mth.lerp(tickDelta, prevX, shownX)
-        val ny = Mth.lerp(tickDelta, prevY, shownY)
-        val (pitch, yaw) = angles(nx, ny)
+        val (pitch, yaw) = angles(frame.normX, frame.normY)
         return Vec3f(
-            Mth.lerp(w, value0.x, pitch),
-            Mth.lerp(w, value0.y, yaw),
-            Mth.lerp(w, value0.z, 0f),
+            Mth.lerp(frame.weight, value0.x, pitch),
+            Mth.lerp(frame.weight, value0.y, yaw),
+            Mth.lerp(frame.weight, value0.z, 0f),
         )
     }
 
@@ -114,6 +123,9 @@ class StaffArmAimAnimation(
         private const val YAW_SPREAD = 0.85f
     }
 }
+
+/** Interpolated aim. [normX] and [normY] are the GUI cursor, ±1 at the edges. [weight] is the fade. */
+data class AimFrame(val normX: Float, val normY: Float, val weight: Float)
 
 /** Per-player layer. Registered at priority [StaffFollowAnimation.LAYER_PRIORITY] so it wins over idle emotes. */
 class StaffFollowLayer(val aim: StaffArmAimAnimation) : ModifierLayer<StaffArmAimAnimation>(aim) {

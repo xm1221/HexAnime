@@ -3,6 +3,7 @@ package cn.xm1221.hexanime.client
 import dev.kosmx.playerAnim.minecraftApi.PlayerAnimationAccess
 import dev.kosmx.playerAnim.minecraftApi.PlayerAnimationFactory
 import cn.xm1221.hexanime.HexAnime
+import cn.xm1221.hexanime.client.anim.StaffArmAimAnimation
 import cn.xm1221.hexanime.client.anim.StaffFollowAnimation
 import cn.xm1221.hexanime.client.anim.StaffFollowLayer
 import cn.xm1221.hexanime.networking.msg.MsgStaffAimS2C
@@ -36,6 +37,8 @@ object StaffFollowClient {
         val entity = minecraft.level?.getEntity(msg.entityId) as? AbstractClientPlayer ?: return
         apply(entity, msg.active, msg.normX, msg.normY, msg.hand)
     }
+
+    fun aim(player: AbstractClientPlayer): StaffArmAimAnimation? = layer(player)?.aim
 
     private fun layer(player: AbstractClientPlayer): StaffFollowLayer? {
         val found = PlayerAnimationAccess.getPlayerAssociatedData(player).get(LAYER_ID)
