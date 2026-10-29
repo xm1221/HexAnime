@@ -1,0 +1,53 @@
+modLoader = "kotlinforforge"
+loaderVersion = "[${versions.kotlin_forge},)"
+license = "MIT"
+
+[[mods]]
+modId = "hexamine"
+version = "${version}"
+displayName = "HexAmine"
+logoFile = "assets/hexamine/icon.png"
+authors = "xm1221"
+description = "Player animation mod for Hex Casting staff casting"
+
+[[dependencies.hexamine]]
+modId = "forge"
+mandatory = true
+versionRange = "[${versions.forge_dependency},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.hexamine]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[${versions.minecraft},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.hexamine]]
+modId = "architectury"
+mandatory = true
+versionRange = "[${versions.architectury},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.hexamine]]
+modId = "cloth_config"
+mandatory = true
+versionRange = "[${versions.cloth_config},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.hexamine]]
+modId = "hexcasting"
+mandatory = false
+versionRange = "[${versions.hexcasting},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.hexamine]]
+modId = "playeranimator"
+mandatory = true
+versionRange = "[0,)"
+ordering = "NONE"
+side = "BOTH"
