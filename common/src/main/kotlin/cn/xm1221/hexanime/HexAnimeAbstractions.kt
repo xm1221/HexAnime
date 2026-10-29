@@ -12,6 +12,7 @@ fun initRegistries(vararg registries: HexAnimeRegistrar<*>) {
 }
 
 @ExpectPlatform
+@Suppress("UNUSED_PARAMETER")
 fun <T : Any> initRegistry(registrar: HexAnimeRegistrar<T>) {
     throw AssertionError()
 }

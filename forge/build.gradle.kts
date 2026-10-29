@@ -2,8 +2,6 @@ plugins {
     id("hexanime.platform")
 }
 
-val modId: String by project
-
 architectury {
     forge()
 }
@@ -19,27 +17,6 @@ loom {
         )
     }
 
-    runs {
-        for ((platform, outputProject) in arrayOf(
-            // we're using forge to do the common datagen because fabric's datagen kind of sucks
-            "common" to project(":common"),
-            "forge" to project,
-        )) {
-            register("${platform}Datagen") {
-                data()
-                programArgs(
-                    "--mod", modId,
-                    "--all",
-                    "--output", outputProject.file("src/generated/resources").absolutePath,
-                    "--existing", file("src/main/resources").absolutePath,
-                    "--existing", project(":common").file("src/main/resources").absolutePath,
-                    "--existing-mod", "hexcasting",
-                )
-                property("hexanime.apply-datagen-mixin", "true")
-                property("hexanime.$platform-datagen", "true")
-            }
-        }
-    }
 }
 
 hexanimeModDependencies {
@@ -71,8 +48,7 @@ dependencies {
     modApi(libs.hexcasting.forge) { isTransitive = false }
     // Hex Casting dependencies
     // we use modLocalRuntime to add these to the development runtime, but not at compile time or for consumers of this project
-    // but we use PAUCAL for datagen, so that's part of the actual implementation
-    modImplementation(libs.paucal.forge)
+    modLocalRuntime(libs.paucal.forge)
     modLocalRuntime(libs.patchouli.forge)
     modLocalRuntime(libs.caelus)
     modLocalRuntime(libs.inline.forge) { isTransitive = false }

@@ -1,6 +1,6 @@
 package cn.xm1221.hexanime.mixin.client;
 
-import cn.xm1221.hexanime.client.StaffFirstPerson;
+import cn.xm1221.hexanime.client.anim.StaffFirstPerson;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
@@ -13,14 +13,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Rotates the vanilla first-person staff hand with the spell cursor.
- *
- * {@code renderArmWithItem} has one push and one pop, and the scoping return happens before the
- * push, so the pair stays balanced. The extra pose is outside vanilla's, in the world hand pass,
- * which is drawn before {@code Screen.render}. First person mode on the playerAnimator layer stays
- * {@code NONE}, so this does not change the third-person bones.
- */
 @Mixin(ItemInHandRenderer.class)
 public class ItemInHandRendererMixin {
     @Unique

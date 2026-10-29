@@ -1,31 +1,31 @@
 package cn.xm1221.hexanime.client
 
-import dev.architectury.event.events.client.ClientTickEvent
 import at.petrak.hexcasting.client.gui.GuiSpellcasting
+import cn.xm1221.hexanime.casting.item.CastItemState
+import cn.xm1221.hexanime.casting.item.CastItems
+import cn.xm1221.hexanime.config.HexAnimeClientConfig
 import cn.xm1221.hexanime.mixin.client.GuiSpellcastingAccessor
 import cn.xm1221.hexanime.networking.msg.MsgStaffAimC2S
 import cn.xm1221.hexanime.staff.Staffs
+import dev.architectury.event.events.client.ClientTickEvent
 import net.minecraft.client.Minecraft
+import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.world.InteractionHand
+import kotlin.math.abs
 
 /**
- * Samples the spell-GUI cursor at about 20 Hz and only sends a packet when the sample changes.
- * The local arm is updated every client tick; the network copy is what other players see.
- *
- * The sample is the mouse position relative to [GuiSpellcasting.coordsOffset] (the grid center),
- * divided by half the GUI size so the edges are ±1. Screen +x is right, +y is down.
+ * Samples the spell GUI at client-tick rate. The wire value remains normalised cursor space; the
+ * angular interpretation is profile-specific and happens on each receiving client.
  */
 object CursorSampler {
-    /** Matches [cn.xm1221.hexanime.staff.StaffAimRelay.MIN_INTERVAL_NANOS]. One send per 50 ms. */
     const val SEND_INTERVAL_NANOS = 50_000_000L
-
-    /** Skip a packet when the cursor has barely moved. */
     const val CHANGE_EPSILON = 0.01f
 
     private var casting = false
     private var lastHand = InteractionHand.MAIN_HAND
     private var lastX = 0f
     private var lastY = 0f
+    private var lastState: CastItemState? = null
     private var lastSentActive = false
     private var lastSentX = 0f
     private var lastSentY = 0f
@@ -45,39 +45,55 @@ object CursorSampler {
 
         val gui = minecraft.screen as? GuiSpellcasting
         if (gui == null) {
-            if (casting) {
-                casting = false
-                StaffFollowClient.apply(player, false, lastX, lastY, lastHand)
-                send(false, lastX, lastY, lastHand, force = true)
-            }
+            stop(player)
             return
         }
 
         val hand = (gui as GuiSpellcastingAccessor).`hexanime$getHandOpenedWith`()
-        if (!Staffs.holdsStaff(player, hand)) {
-            if (casting) {
-                casting = false
-                StaffFollowClient.apply(player, false, lastX, lastY, hand)
-                send(false, lastX, lastY, hand, force = true)
-            }
+        val state = CastItems.snapshot(player.getItemInHand(hand))
+        if (state?.profile?.supportsAim != true) {
+            stop(player, hand)
             return
         }
 
         val (normX, normY) = sample(minecraft, gui)
         casting = true
         lastHand = hand
+        lastState = state
         lastX = normX
         lastY = normY
-        StaffFollowClient.apply(player, true, normX, normY, hand)
+        CastAnimationClient.apply(
+            player,
+            HexAnimeClientConfig.config.enabled,
+            normX,
+            normY,
+            hand,
+            state,
+        )
 
-        val moved = kotlin.math.abs(normX - lastSentX) > CHANGE_EPSILON ||
-            kotlin.math.abs(normY - lastSentY) > CHANGE_EPSILON ||
+        if (!HexAnimeClientConfig.config.syncToServer) {
+            if (lastSentActive) {
+                lastSentActive = false
+                MsgStaffAimC2S(false, 0f, 0f, hand).sendToServer()
+            }
+            return
+        }
+
+        val moved = abs(normX - lastSentX) > CHANGE_EPSILON ||
+            abs(normY - lastSentY) > CHANGE_EPSILON ||
             hand != lastSentHand ||
             !lastSentActive
         if (!moved) return
         val now = System.nanoTime()
         if (lastSentActive && now - lastSentNanos < SEND_INTERVAL_NANOS) return
         send(true, normX, normY, hand, force = false)
+    }
+
+    private fun stop(player: AbstractClientPlayer, hand: InteractionHand = lastHand) {
+        if (!casting) return
+        casting = false
+        CastAnimationClient.apply(player, false, lastX, lastY, hand, lastState)
+        send(false, lastX, lastY, hand, force = true)
     }
 
     private fun sample(minecraft: Minecraft, gui: GuiSpellcasting): Pair<Float, Float> {
@@ -90,12 +106,15 @@ object CursorSampler {
         val center = gui.coordsOffset()
         val halfW = gui.width * 0.5f
         val halfH = gui.height * 0.5f
-        val normX = if (halfW == 0f) 0f else ((mouseX - center.x) / halfW).coerceIn(-Staffs.NORM_LIMIT, Staffs.NORM_LIMIT)
-        val normY = if (halfH == 0f) 0f else ((mouseY - center.y) / halfH).coerceIn(-Staffs.NORM_LIMIT, Staffs.NORM_LIMIT)
+        val normX = if (halfW == 0f) 0f else
+            ((mouseX - center.x) / halfW).coerceIn(-Staffs.NORM_LIMIT, Staffs.NORM_LIMIT)
+        val normY = if (halfH == 0f) 0f else
+            ((mouseY - center.y) / halfH).coerceIn(-Staffs.NORM_LIMIT, Staffs.NORM_LIMIT)
         return normX to normY
     }
 
     private fun send(active: Boolean, normX: Float, normY: Float, hand: InteractionHand, force: Boolean) {
+        if (!HexAnimeClientConfig.config.syncToServer) return
         val now = System.nanoTime()
         if (!force && active && now - lastSentNanos < SEND_INTERVAL_NANOS) return
         lastSentActive = active
@@ -104,5 +123,11 @@ object CursorSampler {
         lastSentHand = hand
         lastSentNanos = now
         MsgStaffAimC2S(active, normX, normY, hand).sendToServer()
+    }
+
+    fun clearServerAim() {
+        if (!lastSentActive) return
+        lastSentActive = false
+        MsgStaffAimC2S(false, 0f, 0f, lastSentHand).sendToServer()
     }
 }

@@ -17,14 +17,6 @@ architectury {
     minecraft = libs.versions.minecraft.get()
 }
 
-tasks {
-    register("runAllDatagen") {
-        dependsOn(":fabric:runDatagen")
-        dependsOn(":forge:runCommonDatagen")
-        dependsOn(":forge:runForgeDatagen")
-    }
-}
-
 publishMods {
     displayName = "v${project.version}"
 

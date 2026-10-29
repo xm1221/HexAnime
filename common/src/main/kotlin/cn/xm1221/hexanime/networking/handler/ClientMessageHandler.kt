@@ -1,7 +1,7 @@
 package cn.xm1221.hexanime.networking.handler
 
 import dev.architectury.networking.NetworkManager.PacketContext
-import cn.xm1221.hexanime.client.StaffFollowClient
+import cn.xm1221.hexanime.client.CastAnimationClient
 import cn.xm1221.hexanime.config.HexAnimeServerConfig
 import cn.xm1221.hexanime.networking.msg.*
 
@@ -11,6 +11,7 @@ fun HexAnimeMessageS2C.applyOnClient(ctx: PacketContext) = ctx.queue {
             HexAnimeServerConfig.onSyncConfig(serverConfig)
         }
 
-        is MsgStaffAimS2C -> StaffFollowClient.onRemote(this)
+        is MsgStaffAimS2C -> CastAnimationClient.onRemote(this)
+        is MsgCastPulseS2C -> CastAnimationClient.onPulse(this)
     }
 }

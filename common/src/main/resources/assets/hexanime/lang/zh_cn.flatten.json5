@@ -1,0 +1,72 @@
+{
+  text: {
+    "autoconfig.hexanime": {
+      title: "HexAnime",
+
+      category: {
+        client: "客户端",
+        server: "服务端",
+      },
+
+      option: {
+        client: {
+          enabled: {
+            "": "启用动画",
+            "@Tooltip": "总开关：控制 HexAnime 的手臂与物品动画。",
+          },
+          damageAnimations: {
+            "": "损坏动画",
+            "@Tooltip": "媒质或耐久较低时显示颤抖与下垂反馈。",
+          },
+          cameraShake: {
+            "": "视野晃动",
+            "@Tooltip": "物品耗尽和施法事故时短暂晃动镜头。",
+          },
+          firstPersonAnimations: {
+            "": "第一人称动画",
+            "@Tooltip": "让原版第一人称手持物品同步施法动作。",
+          },
+          syncToServer: {
+            "": "发送动画状态",
+            "@Tooltip": "把你的法杖瞄准状态发送给服务器，供其他玩家看到。",
+          },
+          receiveRemoteAim: {
+            "": "接收法杖瞄准",
+            "@Tooltip": "允许服务器向你发送其他玩家的连续法杖瞄准。",
+          },
+          receiveRemoteEvents: {
+            "": "接收施法事件",
+            "@Tooltip": "允许接收释放、损坏、耗尽和事故动画事件。",
+          },
+        },
+
+        server: {
+          enabled: {
+            "": "启用服务端同步",
+            "@Tooltip": "允许 HexAnime 广播施法动画状态。",
+          },
+          staffAim: {
+            "": "法杖瞄准同步",
+            "@Tooltip": "绘制咒术图案时，向附近玩家广播法杖指向。",
+          },
+          packagedHexPulse: {
+            "": "封装咒术动画同步",
+            "@Tooltip": "广播神符、饰品与造物的使用和耗尽动画。",
+          },
+          mishapPulse: {
+            "": "事故动画同步",
+            "@Tooltip": "广播法杖与封装咒术施法事故的全身反应。",
+          },
+          refreshIntervalTicks: {
+            "": "刷新间隔",
+            "@Tooltip": "持续施法时重新发送瞄准状态的间隔。",
+          },
+          maxUpdatesPerSecond: {
+            "": "每秒最大更新",
+            "@Tooltip": "单个玩家瞄准数据包每秒最多被接受的次数。",
+          },
+        },
+      },
+    },
+  },
+}

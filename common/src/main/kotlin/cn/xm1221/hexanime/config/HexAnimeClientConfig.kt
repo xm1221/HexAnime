@@ -1,5 +1,6 @@
 package cn.xm1221.hexanime.config
 
+import cn.xm1221.hexanime.HexAnime
 import dev.architectury.event.events.client.ClientPlayerEvent
 import me.shedaniel.autoconfig.AutoConfig
 import me.shedaniel.autoconfig.ConfigData
@@ -11,8 +12,6 @@ import me.shedaniel.autoconfig.annotation.ConfigEntry.Gui.TransitiveObject
 import me.shedaniel.autoconfig.serializer.PartitioningSerializer
 import me.shedaniel.autoconfig.serializer.PartitioningSerializer.GlobalData
 import me.shedaniel.autoconfig.serializer.Toml4jConfigSerializer
-import net.minecraft.world.InteractionResult
-import cn.xm1221.hexanime.HexAnime
 
 object HexAnimeClientConfig {
     @JvmStatic
@@ -26,14 +25,6 @@ object HexAnimeClientConfig {
             GlobalConfig::class.java,
             PartitioningSerializer.wrap(::Toml4jConfigSerializer),
         )
-
-        // when we change the server config in the client gui, also send it to the server config class
-        holder.registerSaveListener { _, config ->
-            HexAnimeServerConfig.holder.config = HexAnimeServerConfig.GlobalConfig(config.server)
-            InteractionResult.PASS
-        }
-
-        // when we leave a server, clear our local copy of its config
         ClientPlayerEvent.CLIENT_PLAYER_QUIT.register { _ ->
             HexAnimeServerConfig.onSyncConfig(null)
         }
@@ -41,19 +32,33 @@ object HexAnimeClientConfig {
 
     @Config(name = HexAnime.MODID)
     class GlobalConfig : GlobalData() {
-        @Category("server")
+        @Category("client")
         @TransitiveObject
         val client = ClientConfig()
-
-        // this should only be used inside of this class; use HexAnimeServerConfig.config to access the server-side config in other code
-        @Category("server")
-        @TransitiveObject
-        val server = HexAnimeServerConfig.ServerConfig()
     }
 
     @Config(name = "client")
     class ClientConfig : ConfigData {
         @Tooltip
-        val dummyClientConfigOption: Boolean = true
+        var enabled: Boolean = true
+
+        @Tooltip
+        var damageAnimations: Boolean = true
+
+        @Tooltip
+        var cameraShake: Boolean = true
+
+        @Tooltip
+        var firstPersonAnimations: Boolean = true
+
+        @Tooltip
+        var syncToServer: Boolean = true
+
+        @Tooltip
+        var receiveRemoteAim: Boolean = true
+
+        @Tooltip
+        var receiveRemoteEvents: Boolean = true
+
     }
 }

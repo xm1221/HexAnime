@@ -5,7 +5,7 @@ import net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent
 import thedarkcolour.kotlinforforge.forge.LOADING_CONTEXT
 
-/** Forge client setup. TODO: staff-follows-cursor lives behind [HexAnimeClient.init]. */
+/** Forge client setup. */
 object ForgeHexAnimeClient {
     @Suppress("UNUSED_PARAMETER")
     fun init(event: FMLClientSetupEvent) {

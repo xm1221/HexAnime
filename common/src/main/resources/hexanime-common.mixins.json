@@ -4,13 +4,16 @@
   "compatibilityLevel": "JAVA_17",
   "minVersion": "0.8",
   "client": [
+    "client.CameraAccessor",
+    "client.CameraMixin",
     "client.GuiSpellcastingAccessor",
     "client.ItemInHandRendererMixin"
   ],
   "mixins": [
-    "MixinDatagenMain"
+    "MishapSideEffectMixin",
+    "PackagedHexUseMixin",
+    "PackagedHexUseAnimationMixin"
   ],
-  "plugin": "cn.xm1221.hexanime.mixin.HexAnimeMixinConfigPlugin",
   "injectors": {
     "defaultRequire": 1
   }

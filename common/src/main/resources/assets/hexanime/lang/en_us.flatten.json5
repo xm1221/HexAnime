@@ -1,47 +1,7 @@
 {
-  hexanime: {
-    book: {
-      patterns: {
-        spells: {
-          dummy_spells: {
-            "": "Dummy Spells",
-            congratulate: "Remove an entity from the stack, then congratulate them.",
-          },
-        },
-        great_spells: {
-          dummy_great_spells: {
-            "": "Dummy Great Spells",
-            "congratulate/great": "Same as $(l:patterns/spells/dummy_spells#hexanime:congratulate)$(action)Congratulate/$, but as a great spell.",
-          },
-        },
-      },
-    },
-  },
-
-  hexcasting: {
-    action: {
-      "hexanime:": {
-        congratulate: "Congratulate Player",
-        "congratulate/great": "Great Congrats!",
-      },
-
-      // use this to add shortened versions of pattern names if the full name won't fit in the ingame book
-      // you don't need to add an entry for every pattern - the above value will be used as a default
-      book: {
-        "hexanime:": {
-          congratulate: "Congratulate",
-        },
-      },
-    },
-  },
-
   text: {
-    hexanime: {
-      congrats: "Tell %1$s they're doing a good job!",
-    },
-
     "autoconfig.hexanime": {
-      title: "HexAnime Config",
+      title: "HexAnime",
 
       category: {
         client: "Client",
@@ -50,16 +10,60 @@
 
       option: {
         client: {
-          dummyClientConfigOption: {
-            "": "Dummy Client Config Option",
-            "@Tooltip": "This is an example of a client-side config option that accepts a boolean.",
+          enabled: {
+            "": "Enable animations",
+            "@Tooltip": "Turns all HexAnime arm and item motion on or off.",
+          },
+          damageAnimations: {
+            "": "Damage animations",
+            "@Tooltip": "Shows tremor and droop as media or durability runs low.",
+          },
+          cameraShake: {
+            "": "Camera shake",
+            "@Tooltip": "Adds a brief view shake on breaks and casting mishaps.",
+          },
+          firstPersonAnimations: {
+            "": "First-person animations",
+            "@Tooltip": "Applies the same cast motion to the vanilla first-person hand.",
+          },
+          syncToServer: {
+            "": "Send animation state",
+            "@Tooltip": "Sends your spell aim to the server for other players to see.",
+          },
+          receiveRemoteAim: {
+            "": "Receive staff aim",
+            "@Tooltip": "Allows the server to send other players' continuous staff aiming.",
+          },
+          receiveRemoteEvents: {
+            "": "Receive cast events",
+            "@Tooltip": "Allows release, damage, break and mishap animation events.",
           },
         },
 
         server: {
-          dummyServerConfigOption: {
-            "": "Dummy Server Config Option",
-            "@Tooltip": "This is an example of a server-side config option that accepts an integer.",
+          enabled: {
+            "": "Enable server sync",
+            "@Tooltip": "Allows HexAnime to broadcast cast animation state.",
+          },
+          staffAim: {
+            "": "Staff aim sync",
+            "@Tooltip": "Broadcasts cursor-driven staff aiming while the spell grid is open.",
+          },
+          packagedHexPulse: {
+            "": "Packaged Hex pulse sync",
+            "@Tooltip": "Broadcasts use and depletion animations for cyphers, trinkets and artifacts.",
+          },
+          mishapPulse: {
+            "": "Mishap animation sync",
+            "@Tooltip": "Broadcasts full-body mishap reactions for staff and packaged-Hex casting.",
+          },
+          refreshIntervalTicks: {
+            "": "Refresh interval",
+            "@Tooltip": "How often a still-active staff aim is refreshed for newly tracking clients.",
+          },
+          maxUpdatesPerSecond: {
+            "": "Maximum updates per second",
+            "@Tooltip": "Upper bound for accepted staff aim packets from one player.",
           },
         },
       },

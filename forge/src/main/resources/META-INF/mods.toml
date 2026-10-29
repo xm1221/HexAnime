@@ -8,7 +8,7 @@ version = "${version}"
 displayName = "HexAnime"
 logoFile = "assets/hexanime/icon.png"
 authors = "xm1221"
-description = "Player animation mod for Hex Casting staff casting"
+description = "Cursor-driven staff and packaged-Hex casting animations for Hex Casting"
 
 [[dependencies.hexanime]]
 modId = "forge"

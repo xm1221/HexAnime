@@ -27,4 +27,6 @@ dependencies {
         implementation(it)
         annotationProcessor(it)
     }
+
+    testImplementation(kotlin("test"))
 }

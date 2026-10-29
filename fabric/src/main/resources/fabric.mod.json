@@ -3,7 +3,7 @@
   "id": "hexanime",
   "version": "${version}",
   "name": "HexAnime",
-  "description": "Player animation mod for Hex Casting staff casting",
+  "description": "Cursor-driven staff and packaged-Hex casting animations for Hex Casting",
   "authors": [
     "xm1221"
   ],
@@ -26,10 +26,6 @@
     "server": [{
       "adapter": "kotlin",
       "value": "cn.xm1221.hexanime.fabric.FabricHexAnimeServer"
-    }],
-    "fabric-datagen": [{
-      "adapter": "kotlin",
-      "value": "cn.xm1221.hexanime.fabric.datagen.FabricHexAnimeDatagen"
     }],
     "modmenu": [{
       "adapter": "kotlin",

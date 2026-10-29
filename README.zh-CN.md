@@ -1,43 +1,44 @@
 # HexAnime
 
-Minecraft 1.20.1 玩家动画模组（Architectury，Fabric + Forge，Mojmap）。
+Minecraft 1.20.1 玩家动画模组，基于 Architectury，支持 Fabric 与 Forge。作者 xm1221。
 
-> 仓库：https://github.com/xm1221/HexAnime
+仓库：https://github.com/xm1221/HexAnime
 
-## 这个模组做什么
+## 功能
 
-手持 **Hex Casting** 的法杖，并打开咒术绘制界面（`GuiSpellcasting`）画图案时，持杖的那只手臂会指向鼠标光标，其他玩家也能看到。
-
-- 法杖判定：Hex 的 `ItemStaff`，或物品标签 `hexcasting:staves`。
-- 主手默认用右臂。副手用另一只手臂；左撇子会换成左臂。
-- 光标相对绘制网格中心采样，大约 20 Hz，只有变化时才发给服务器。
-- 服务器确认玩家拿着法杖、限制频率、夹紧数值，再广播给附近能看见该玩家的人。
-- 使用 KosmX **playerAnimator**（优先级 1000），每帧插值，关掉界面后淡出。
-- **第一人称**里，原版手臂和手持法杖也会跟着光标转，画在世界层，界面盖在上面。第三人称（F5）和其他玩家看到的跟随不变。
+- 打开 Hex Casting 绘制界面时，法杖保持近身竖直姿态，光标只让手腕和手臂做小幅倾斜；第一人称和第三人称都有对应动作。
+- 封装咒术物品真正释放时播放一次性施法动作，包括 Artifact、Trinket、Cypher 和 Ancient Cypher。
+- 八个 Hex 视觉 Variant 各自选择不同的全身动作；物品种类只用于判断它是不是封装咒术。
+- 媒质耗尽或物品耐久较低时，手臂和物品会持续颤抖、下垂并触发事件；Cypher 最后一次耗尽有更强的断裂反馈。
+- Hex Mishap 会触发统一的全身反冲和更强烈的第一人称晃动。
+- 部分 Variant 使用不死图腾式爆点：短暂压缩、整体上弹、双臂张开、定格后回落。
+- 封装咒术一次性施法使用分阶段关键帧，其第一人称直接渲染玩家模型的手臂和物品；法杖瞄准保留原来的原版手部第一人称路径。
+- 法杖瞄准恢复直接归一化映射和固定平滑，不使用后期加入的径向或死区处理。
+- 客户端可分别关闭本地动画、上传自身状态、接收连续瞄准或接收远程事件；服务端也可按同步类别全局关闭。
 
 playerAnimator **没有**打进本模组，请向原作者 KosmX 下载。
 
-版本 `0.0.1`（`0.0.1+1.20.1`）。
+## 动画结构
 
-## 需要自行安装的依赖
+- `CastItemProfiles`：物品到动画档案的有序注册表，按优先级匹配，可继续注册第三方物品。
+- 法杖瞄准固定使用原始的 yaw/pitch 比例，封装咒术不使用光标瞄准。
+- `PulsePose`：封装咒术释放、耗尽时复用的短动作。
+- `DamagePose`：低媒质或低耐久时的颤抖、下垂参数。
+- `CastItemAnimation`：每个玩家一层 playerAnimator 动画，同时管理主手和副手。
 
-### HexAnime 直接要求
+## 依赖
+
+以下都是硬依赖。缺少时游戏会拒绝加载。
 
 - Minecraft 1.20.1，Java 17
-- Hex Casting `>= 0.11.3`（模组 ID `hexcasting`）
-- playerAnimator `>= 1.0.2-rc1+1.20`（Fabric 模组 ID `player-animator`，Forge 模组 ID `playeranimator`）。从原作者处下载，不要使用重新打包的副本
+- Hex Casting `>= 0.11.4`
+- playerAnimator `>= 1.0.2-rc1+1.20`
 - Architectury API `>= 9.2.14`
 - Cloth Config `>= 11.1.106`
-- Fabric：Fabric API `>= 0.87.0+1.20.1`、Fabric Language Kotlin `>= 1.10.18+kotlin.1.9.22`
-- Forge：Forge `>= 47`、Kotlin for Forge `>= 4.10.0`
+- Fabric：Loader `>= 0.16.9`、Fabric API `>= 0.92.8+1.20.1`、Fabric Language Kotlin `>= 1.13.7+kotlin.2.2.21`
+- Forge：Forge `>= 47`、Kotlin for Forge `>= 4.12.0`
 
-### Hex Casting 还要求
-
-**Fabric：** PAUCAL（`>= 0.6.0-pre` 且 `< 0.7.0`）、Patchouli（`>= 1.20.1-80`）、Cardinal Components API（`~5.2.1`，含 base / entity / item / block）、Inline（`>= 1.20.1-1.0.1`）、Cloth Config。
-
-**Forge：** PAUCAL（`[0.6.0, 0.7.0)`）、Patchouli（`[1.20.1-80,)`）、Caelus（`[3.1.0+1.20,)`）、Inline（`[1.20.1-1.0.1,)`）、Kotlin for Forge。
-
-Mod Menu 可选，用来打开配置界面。
+Hex Casting 自身还需要 PAUCAL、Patchouli、Inline `>= 1.20.1-1.2.2`，以及 Fabric 的 Cardinal Components 或 Forge 的 Caelus。Mod Menu 是可选的 Fabric 配置入口。
 
 ## 构建
 
@@ -45,8 +46,4 @@ Mod Menu 可选，用来打开配置界面。
 ./gradlew build
 ```
 
-需要 Java 17。模板：MieHexTemplate（Mojmap，`use_mielib=no`）。
-
-## 许可证
-
-MIT © xm1221
+需要 Java 17。项目模板来自 MieHexTemplate，许可证为 MIT。

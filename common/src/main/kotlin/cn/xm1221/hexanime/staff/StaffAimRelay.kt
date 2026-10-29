@@ -3,6 +3,10 @@ package cn.xm1221.hexanime.staff
 import dev.architectury.event.events.common.PlayerEvent
 import dev.architectury.event.events.common.TickEvent
 import cn.xm1221.hexanime.HexAnime
+import cn.xm1221.hexanime.casting.PlayerTracking
+import cn.xm1221.hexanime.casting.AnimationPreferences
+import cn.xm1221.hexanime.casting.item.CastItems
+import cn.xm1221.hexanime.config.HexAnimeServerConfig
 import cn.xm1221.hexanime.networking.msg.MsgStaffAimC2S
 import cn.xm1221.hexanime.networking.msg.MsgStaffAimS2C
 import net.minecraft.server.MinecraftServer
@@ -15,17 +19,14 @@ import java.util.UUID
  * Active updates are capped at about 20 Hz. Values are clamped. Tracking players receive an S2C copy.
  */
 object StaffAimRelay {
-    /** Upper bound on accepted active packets. 50 ms is 20 Hz. */
-    const val MIN_INTERVAL_NANOS = 50_000_000L
-
-    /** How often a still-active aim is repeated so players who just started tracking catch up. */
-    const val REFRESH_TICKS = 20
-
     private data class Published(
         val active: Boolean,
         val normX: Float,
         val normY: Float,
         val hand: InteractionHand,
+        val profileId: String,
+        val variant: Int,
+        val strain: Float,
     )
 
     private val published = HashMap<UUID, Published>()
@@ -40,6 +41,16 @@ object StaffAimRelay {
     }
 
     fun handle(player: ServerPlayer, msg: MsgStaffAimC2S) {
+        val config = HexAnimeServerConfig.config
+        if (!config.enabled || !config.staffAim) {
+            published[player.uuid]?.let { old ->
+                val cleared = old.copy(active = false, normX = 0f, normY = 0f)
+                published[player.uuid] = cleared
+                broadcast(player, cleared)
+            }
+            return
+        }
+
         val normX = Staffs.clampNorm(msg.normX)
         val normY = Staffs.clampNorm(msg.normY)
         if (normX == null || normY == null) {
@@ -47,15 +58,27 @@ object StaffAimRelay {
             return
         }
 
-        val holding = Staffs.holdsStaff(player, msg.hand)
+        val sample = player.getItemInHand(msg.hand)
+        val state = CastItems.snapshot(sample)
+        val holding = state?.profile?.supportsAim == true
         val active = msg.active && holding
         if (msg.active && !allow(player)) return
+        if (state == null) {
+            val old = published[player.uuid] ?: return
+            val cleared = old.copy(active = false, normX = 0f, normY = 0f)
+            published[player.uuid] = cleared
+            broadcast(player, cleared)
+            return
+        }
 
         val next = Published(
             active = active,
             normX = if (active) normX else 0f,
             normY = if (active) normY else 0f,
             hand = msg.hand,
+            profileId = state.profile.id.toString(),
+            variant = state.variant,
+            strain = state.strain,
         )
         if (published[player.uuid] == next) return
         published[player.uuid] = next
@@ -68,28 +91,37 @@ object StaffAimRelay {
     private fun allow(player: ServerPlayer): Boolean {
         val now = System.nanoTime()
         val last = lastAcceptedNanos[player.uuid]
-        if (last != null && now - last < MIN_INTERVAL_NANOS) return false
+        if (last != null && now - last < HexAnimeServerConfig.config.minIntervalNanos()) return false
         lastAcceptedNanos[player.uuid] = now
         return true
     }
 
     private fun refresh(server: MinecraftServer) {
-        if (server.tickCount % REFRESH_TICKS != 0) return
+        val config = HexAnimeServerConfig.config
+        if (!config.enabled || !config.staffAim || server.tickCount % config.refreshTicks() != 0) return
         for (player in server.playerList.players) {
             val aim = published[player.uuid] ?: continue
             if (!aim.active) continue
-            if (!Staffs.holdsStaff(player, aim.hand)) {
+            val state = CastItems.snapshot(player.getItemInHand(aim.hand))
+            if (state?.profile?.supportsAim != true) {
                 val cleared = aim.copy(active = false, normX = 0f, normY = 0f)
                 published[player.uuid] = cleared
                 broadcast(player, cleared)
                 continue
             }
-            broadcast(player, aim)
+            val refreshed = aim.copy(
+                profileId = state.profile.id.toString(),
+                variant = state.variant,
+                strain = state.strain,
+            )
+            published[player.uuid] = refreshed
+            broadcast(player, refreshed)
         }
     }
 
     private fun broadcast(player: ServerPlayer, aim: Published) {
-        val watchers = tracking(player)
+        val watchers = PlayerTracking.watchers(player)
+            .filter(AnimationPreferences::acceptsAim)
         if (watchers.isEmpty()) return
         MsgStaffAimS2C(
             entityId = player.id,
@@ -97,23 +129,9 @@ object StaffAimRelay {
             normX = aim.normX,
             normY = aim.normY,
             hand = aim.hand,
+            profileId = aim.profileId,
+            variant = aim.variant,
+            strain = aim.strain,
         ).sendToPlayers(watchers)
-    }
-
-    /**
-     * Players in the same dimension inside this entity's vanilla client-tracking range.
-     * The caster is not included; their own client already has the sampled aim.
-     */
-    private fun tracking(player: ServerPlayer): List<ServerPlayer> {
-        val level = player.serverLevel()
-        val blocks = player.type.clientTrackingRange() * 16.0
-        val rangeSqr = blocks * blocks
-        val out = ArrayList<ServerPlayer>()
-        for (other in level.players()) {
-            if (other === player) continue
-            if (other.distanceToSqr(player) > rangeSqr) continue
-            out.add(other)
-        }
-        return out
     }
 }

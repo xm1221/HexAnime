@@ -105,7 +105,7 @@ publishMods {
         accessToken = System.getenv("CURSEFORGE_TOKEN") ?: ""
         projectId = curseforgeId
         minecraftVersions.add(minecraftVersion)
-        // TODO: update if your mod is only client-side or server-side!
+        // HexAnime synchronizes cosmetic state, so both sides are required.
         clientRequired = true
         serverRequired = true
     }

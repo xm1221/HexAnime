@@ -10,6 +10,9 @@ data class MsgStaffAimS2C(
     val normX: Float,
     val normY: Float,
     val hand: InteractionHand,
+    val profileId: String,
+    val variant: Int,
+    val strain: Float,
 ) : HexAnimeMessageS2C {
     companion object : HexAnimeMessageCompanion<MsgStaffAimS2C> {
         override val type = MsgStaffAimS2C::class.java
@@ -20,6 +23,9 @@ data class MsgStaffAimS2C(
             normX = buf.readFloat(),
             normY = buf.readFloat(),
             hand = buf.readEnum(InteractionHand::class.java),
+            profileId = buf.readUtf(128),
+            variant = buf.readVarInt(),
+            strain = buf.readFloat(),
         )
 
         override fun MsgStaffAimS2C.encode(buf: FriendlyByteBuf) {
@@ -28,6 +34,9 @@ data class MsgStaffAimS2C(
             buf.writeFloat(normX)
             buf.writeFloat(normY)
             buf.writeEnum(hand)
+            buf.writeUtf(profileId, 128)
+            buf.writeVarInt(variant)
+            buf.writeFloat(strain)
         }
     }
 }

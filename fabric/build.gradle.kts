@@ -6,23 +6,6 @@ architectury {
     fabric()
 }
 
-fabricApi {
-    configureDataGeneration {
-        outputDirectory = file("src/generated/resources")
-        modId = providers.gradleProperty("modId")
-        strictValidation = true
-        addToResources = false
-    }
-}
-
-loom {
-    runs {
-        named("datagen") {
-            property("hexanime.apply-datagen-mixin", "true")
-        }
-    }
-}
-
 hexanimeModDependencies {
     // expand versions in fabric.mod.json
     filesMatching.add("fabric.mod.json")
