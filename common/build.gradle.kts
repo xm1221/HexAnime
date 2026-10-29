@@ -19,6 +19,10 @@ dependencies {
 
     modApi(libs.clothConfig.common)
 
+    // KosmX playerAnimator. Compile against the Fabric artifact (Loom remaps it).
+    // Not bundled: Fabric and Forge redeclare modImplementation without include/shadow.
+    modImplementation(libs.playerAnim.fabric)
+
     libs.mixinExtras.common.also {
         implementation(it)
         annotationProcessor(it)

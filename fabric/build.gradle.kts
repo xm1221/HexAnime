@@ -41,8 +41,9 @@ hexanimeModDependencies {
     // CurseForge/Modrinth mod dependency metadata
     requires("architectury-api")
     requires("cloth-config")
-    // Hex Casting is optional/compat for the planned staff-follow feature
-    optional(curseforge = "hexcasting", modrinth = "hex-casting")
+    requires(curseforge = "hexcasting", modrinth = "hex-casting")
+    // KosmX playerAnimator — players download it; do not bundle.
+    requires(curseforge = "playeranimator", modrinth = "playeranimator")
     requires("fabric-api")
     requires("fabric-language-kotlin")
     optional("modmenu")
@@ -83,9 +84,6 @@ dependencies {
     }
     modImplementation(libs.modMenu)
 
-    // KosmX playerAnimator — JiJ via include, never shadow
-    libs.playerAnim.fabric.also {
-        modImplementation(it)
-        include(it)
-    }
+    // KosmX playerAnimator — modImplementation only (compile + dev runtime). No include / Jar-in-Jar, no shadow.
+    modImplementation(libs.playerAnim.fabric)
 }

@@ -34,20 +34,20 @@ side = "BOTH"
 [[dependencies.hexanime]]
 modId = "cloth_config"
 mandatory = true
-versionRange = "[${versions.cloth_config},)"
+versionRange = "[${versions.clothConfig},)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.hexanime]]
 modId = "hexcasting"
-mandatory = false
+mandatory = true
 versionRange = "[${versions.hexcasting},)"
-ordering = "NONE"
+ordering = "AFTER"
 side = "BOTH"
 
 [[dependencies.hexanime]]
 modId = "playeranimator"
 mandatory = true
-versionRange = "[0,)"
+versionRange = "[${versions.playerAnim},)"
 ordering = "NONE"
 side = "BOTH"

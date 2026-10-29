@@ -47,10 +47,10 @@
     "fabric-language-kotlin": ">=${versions.kotlin_fabric}",
     "architectury": ">=${versions.architectury}",
     "cloth-config": ">=${versions.clothConfig}",
-    "playeranimator": "*"
+    "hexcasting": ">=${versions.hexcasting}",
+    "player-animator": ">=${versions.playerAnim}"
   },
   "suggests": {
-    "modmenu": ">=${versions.modMenu}",
-    "hexcasting": ">=${versions.hexcasting}"
+    "modmenu": ">=${versions.modMenu}"
   }
 }

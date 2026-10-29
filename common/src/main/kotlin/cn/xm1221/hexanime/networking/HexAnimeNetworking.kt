@@ -11,5 +11,6 @@ object HexAnimeNetworking {
         for (subclass in HexAnimeMessageCompanion::class.sealedSubclasses) {
             subclass.objectInstance?.register(CHANNEL)
         }
+        HexAnime.LOGGER.info("Registered HexAnime network channel {}", HexAnime.id("networking_channel"))
     }
 }

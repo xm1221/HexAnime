@@ -8,7 +8,6 @@ import net.minecraft.client.gui.screens.Screen
 object HexAnimeClient {
     fun init() {
         HexAnimeClientConfig.init()
-        // TODO: staff-follows-cursor feature (stubs only for now)
         StaffFollowClient.init()
     }
 
