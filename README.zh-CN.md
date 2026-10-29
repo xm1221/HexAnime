@@ -1,8 +1,8 @@
-# HexAmine
+# HexAnime
 
 Minecraft 1.20.1 玩家动画模组（Architectury，Fabric + Forge）。
 
-> **命名待确认：** 本地目录暂为 `HexAmine` / `hexamine`，最终仓库名可能是 HexAmine 或 HexAnime。
+> **最终命名：** HexAnime（anime = animation）。仓库：https://github.com/xm1221/HexAnime
 
 ## 用途
 

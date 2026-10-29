@@ -1,6 +1,6 @@
-# hexdoc-hexamine
+# hexdoc-hexanime
 
-Python web book docgen and [hexdoc](https://pypi.org/project/hexdoc) plugin for HexAmine.
+Python web book docgen and [hexdoc](https://pypi.org/project/hexdoc) plugin for HexAnime.
 
 Player animation mod for Hex Casting staff casting
 
@@ -32,9 +32,9 @@ source .venv/bin/activate  # everything else
 For local testing, create a file called `.env` in the repo root following this template:
 
 ```sh
-GITHUB_REPOSITORY=xm1221/HexAmine
+GITHUB_REPOSITORY=xm1221/HexAnime
 GITHUB_SHA=main
-GITHUB_PAGES_URL=https://xm1221.github.io/HexAmine
+GITHUB_PAGES_URL=https://xm1221.github.io/HexAnime
 ```
 
 Useful commands:

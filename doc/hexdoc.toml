@@ -1,4 +1,4 @@
-modid = "hexamine"
+modid = "hexanime"
 book = "hexcasting:thehexbook"
 
 resource_dirs = [  # top takes priority
@@ -13,18 +13,18 @@ resource_dirs = [  # top takes priority
     { modid="minecraft" },
     { modid="hexdoc" },
 ]
-export_dir = "src/hexdoc_hexamine/_export/generated"
+export_dir = "src/hexdoc_hexanime/_export/generated"
 
 [template]
-icon = "{$_common.src}/main/resources/assets/hexamine/icon.png"
+icon = "{$_common.src}/main/resources/assets/hexanime/icon.png"
 include = [
-    "hexamine",
+    "hexanime",
     "hexcasting",
     "hexdoc",
 ]
 
 [template.args]
-mod_name = "HexAmine"
+mod_name = "HexAnime"
 author = "xm1221"
 show_landing_text = false
 
@@ -33,22 +33,22 @@ show_landing_text = false
 _pattern_regex = { "!Raw"='make\("(?P<name>[^"]+)",\s*HexDir\.(?P<startdir>\w+),\s*"(?P<signature>[qweasd]+)"' }
 
 [[extra.hexcasting.pattern_stubs]]
-path = "{$_common.kotlin}/registry/HexAmineActions.kt"
+path = "{$_common.kotlin}/registry/HexAnimeActions.kt"
 regex = "{^_pattern_regex}"
 
 # platforms
 
 [_common]
 src = "../common/src"
-java = "{src}/main/java/cn/xm1221/hexamine"
-kotlin = "{src}/main/kotlin/cn/xm1221/hexamine"
+java = "{src}/main/java/cn/xm1221/hexanime"
+kotlin = "{src}/main/kotlin/cn/xm1221/hexanime"
 
 [_fabric]
 src = "../fabric/src"
-java = "{src}/main/java/cn/xm1221/hexamine/fabric"
-kotlin = "{src}/main/kotlin/cn/xm1221/hexamine/fabric"
+java = "{src}/main/java/cn/xm1221/hexanime/fabric"
+kotlin = "{src}/main/kotlin/cn/xm1221/hexanime/fabric"
 
 [_forge]
 src = "../forge/src"
-java = "{src}/main/java/cn/xm1221/hexamine/forge"
-kotlin = "{src}/main/kotlin/cn/xm1221/hexamine/forge"
+java = "{src}/main/java/cn/xm1221/hexanime/forge"
+kotlin = "{src}/main/kotlin/cn/xm1221/hexanime/forge"

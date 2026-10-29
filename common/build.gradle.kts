@@ -1,5 +1,5 @@
 plugins {
-    id("hexamine.minecraft")
+    id("hexanime.minecraft")
 }
 
 architectury {

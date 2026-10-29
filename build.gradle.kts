@@ -1,6 +1,6 @@
 plugins {
-    id("hexamine.java")
-    id("hexamine.mod-publish")
+    id("hexanime.java")
+    id("hexanime.mod-publish")
 }
 
 val minecraftVersion: String by project

@@ -1,44 +1,44 @@
 {
   "schemaVersion": 1,
-  "id": "hexamine",
+  "id": "hexanime",
   "version": "${version}",
-  "name": "HexAmine",
+  "name": "HexAnime",
   "description": "Player animation mod for Hex Casting staff casting",
   "authors": [
     "xm1221"
   ],
   "contact": {
-    "homepage": "https://xm1221.github.io/HexAmine",
-    "sources": "https://github.com/xm1221/HexAmine"
+    "homepage": "https://xm1221.github.io/HexAnime",
+    "sources": "https://github.com/xm1221/HexAnime"
   },
   "license": "MIT",
-  "icon": "assets/hexamine/icon.png",
+  "icon": "assets/hexanime/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [{
       "adapter": "kotlin",
-      "value": "cn.xm1221.hexamine.fabric.FabricHexAmine"
+      "value": "cn.xm1221.hexanime.fabric.FabricHexAnime"
     }],
     "client": [{
       "adapter": "kotlin",
-      "value": "cn.xm1221.hexamine.fabric.FabricHexAmineClient"
+      "value": "cn.xm1221.hexanime.fabric.FabricHexAnimeClient"
     }],
     "server": [{
       "adapter": "kotlin",
-      "value": "cn.xm1221.hexamine.fabric.FabricHexAmineServer"
+      "value": "cn.xm1221.hexanime.fabric.FabricHexAnimeServer"
     }],
     "fabric-datagen": [{
       "adapter": "kotlin",
-      "value": "cn.xm1221.hexamine.fabric.datagen.FabricHexAmineDatagen"
+      "value": "cn.xm1221.hexanime.fabric.datagen.FabricHexAnimeDatagen"
     }],
     "modmenu": [{
       "adapter": "kotlin",
-      "value": "cn.xm1221.hexamine.fabric.FabricHexAmineModMenu"
+      "value": "cn.xm1221.hexanime.fabric.FabricHexAnimeModMenu"
     }]
   },
   "mixins": [
-    "hexamine-common.mixins.json",
-    "hexamine-fabric.mixins.json"
+    "hexanime-common.mixins.json",
+    "hexanime-fabric.mixins.json"
   ],
   "depends": {
     "minecraft": "${versions.minecraft}",

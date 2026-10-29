@@ -10,5 +10,5 @@ pluginManagement {
     }
 }
 
-rootProject.name = "HexAmine"
+rootProject.name = "HexAnime"
 include("common", "fabric", "forge")

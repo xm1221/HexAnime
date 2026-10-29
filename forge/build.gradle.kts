@@ -1,5 +1,5 @@
 plugins {
-    id("hexamine.platform")
+    id("hexanime.platform")
 }
 
 val modId: String by project
@@ -14,8 +14,8 @@ loom {
         extraAccessWideners.add(loom.accessWidenerPath.get().asFile.name)
 
         mixinConfig(
-            "hexamine-common.mixins.json",
-            "hexamine-forge.mixins.json",
+            "hexanime-common.mixins.json",
+            "hexanime-forge.mixins.json",
         )
     }
 
@@ -35,14 +35,14 @@ loom {
                     "--existing", project(":common").file("src/main/resources").absolutePath,
                     "--existing-mod", "hexcasting",
                 )
-                property("hexamine.apply-datagen-mixin", "true")
-                property("hexamine.$platform-datagen", "true")
+                property("hexanime.apply-datagen-mixin", "true")
+                property("hexanime.$platform-datagen", "true")
             }
         }
     }
 }
 
-hexamineModDependencies {
+hexanimeModDependencies {
     // expand versions in mods.toml
     filesMatching.add("META-INF/mods.toml")
 

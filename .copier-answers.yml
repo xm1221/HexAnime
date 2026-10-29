@@ -4,18 +4,18 @@ _commit: v2.2.4
 _src_path: MieHexTemplate
 advanced: true
 capitalize_platforms: false
-classname: HexAmine
+classname: HexAnime
 default_branch: main
 description: Player animation mod for Hex Casting staff casting
-display_name: HexAmine
-github_repo: HexAmine
+display_name: HexAnime
+github_repo: HexAnime
 github_user: xm1221
-homepage_url: https://xm1221.github.io/HexAmine
-java_package: cn.xm1221.hexamine
-kotlin_package: cn.xm1221.hexamine
+homepage_url: https://xm1221.github.io/HexAnime
+java_package: cn.xm1221.hexanime
+kotlin_package: cn.xm1221.hexanime
 mappings_name: Mojmap
 minecraft_version_in_mod_version: true
 mit_license: true
 mod_version: 0.0.1
-modid: hexamine
-sources_url: https://github.com/xm1221/HexAmine
+modid: hexanime
+sources_url: https://github.com/xm1221/HexAnime

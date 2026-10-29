@@ -8,7 +8,7 @@ build-backend = "hatchling.build"
 # project metadata
 
 [project]
-name = "hexdoc-hexamine"
+name = "hexdoc-hexanime"
 description = "Player animation mod for Hex Casting staff casting"
 readme = "doc/README.md"
 authors = [
@@ -19,15 +19,15 @@ requires-python = ">=3.12"
 dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.urls]
-Homepage = "https://xm1221.github.io/HexAmine"
-Source = "https://github.com/xm1221/HexAmine"
+Homepage = "https://xm1221.github.io/HexAnime"
+Source = "https://github.com/xm1221/HexAnime"
 
 # project version
 
 [tool.hatch.version]
 scheme = "gradle"
 source = "gradle-properties"
-py-path = "doc/src/hexdoc_hexamine/__version__.py"
+py-path = "doc/src/hexdoc_hexanime/__version__.py"
 key = "modVersion"
 gradle-version-regex = { regex='^(.+?)(-.+)?$', repl='\1.{minecraftVersion}\2' }
 
@@ -49,11 +49,11 @@ dev = [
 
 [tool.hatch.build]
 only-include = [
-    "doc/src/hexdoc_hexamine",
+    "doc/src/hexdoc_hexanime",
     "gradle.properties", ]
 artifacts = [
-    "/doc/src/hexdoc_hexamine/_export/generated",
-    "/doc/src/hexdoc_hexamine/__gradle_version__.py",
+    "/doc/src/hexdoc_hexanime/_export/generated",
+    "/doc/src/hexdoc_hexanime/__gradle_version__.py",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -62,7 +62,7 @@ sources = ["doc/src"]
 # hexdoc entry point
 
 [project.entry-points.hexdoc]
-hexamine = "hexdoc_hexamine._hooks:HexAminePlugin"
+hexanime = "hexdoc_hexanime._hooks:HexAnimePlugin"
 
 # linting
 

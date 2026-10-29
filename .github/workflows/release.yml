@@ -25,7 +25,7 @@ on:
         default: false
 
 env:
-  PYPI_PACKAGE: hexdoc-hexamine
+  PYPI_PACKAGE: hexdoc-hexanime
 
 jobs:
   build:

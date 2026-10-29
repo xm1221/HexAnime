@@ -1,5 +1,5 @@
 plugins {
-    id("hexamine.platform")
+    id("hexanime.platform")
 }
 
 architectury {
@@ -18,12 +18,12 @@ fabricApi {
 loom {
     runs {
         named("datagen") {
-            property("hexamine.apply-datagen-mixin", "true")
+            property("hexanime.apply-datagen-mixin", "true")
         }
     }
 }
 
-hexamineModDependencies {
+hexanimeModDependencies {
     // expand versions in fabric.mod.json
     filesMatching.add("fabric.mod.json")
 
