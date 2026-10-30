@@ -24,7 +24,7 @@ class SpringDamperTest {
     fun underdampedStepOvershootsThenStaysBounded() {
         val woodPeak = peak(StaffSprings.forMaterial(StaffMaterial.WOOD))
         val quenchedPeak = peak(StaffSprings.forMaterial(StaffMaterial.QUENCHED))
-        assertTrue(woodPeak > 1.02f, "wood should overshoot, peak=$woodPeak")
+        assertTrue(woodPeak > 1.05f, "wood should overshoot, peak=$woodPeak")
         assertTrue(quenchedPeak > woodPeak, "quenched should overshoot more than wood")
         assertTrue(quenchedPeak < 2.5f, "quenched ran away: $quenchedPeak")
     }

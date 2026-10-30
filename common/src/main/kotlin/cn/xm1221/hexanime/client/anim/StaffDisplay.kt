@@ -1,5 +1,6 @@
 package cn.xm1221.hexanime.client.anim
 
+import kotlin.UninitializedPropertyAccessException
 import kotlin.math.cos
 import kotlin.math.round
 import kotlin.math.sin
@@ -50,9 +51,11 @@ object StaffDisplayTuning {
     fun mindspliceDrift(): Float = (clientFloat { it.mindspliceDrift.toFloat() } ?: 0.03f)
         .coerceIn(0f, 0.12f)
 
-    private fun clientFloat(read: (cn.xm1221.hexanime.config.HexAnimeClientConfig.ClientConfig) -> Float): Float? {
-        if (!cn.xm1221.hexanime.config.HexAnimeClientConfig::holder.isInitialized) return null
-        return read(cn.xm1221.hexanime.config.HexAnimeClientConfig.config)
-    }
+    private fun clientFloat(read: (cn.xm1221.hexanime.config.HexAnimeClientConfig.ClientConfig) -> Float): Float? =
+        try {
+            read(cn.xm1221.hexanime.config.HexAnimeClientConfig.config)
+        } catch (_: UninitializedPropertyAccessException) {
+            null
+        }
 }
 

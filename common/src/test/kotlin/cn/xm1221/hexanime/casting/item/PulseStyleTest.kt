@@ -21,8 +21,8 @@ class PulseStyleTest {
     @Test
     fun artifactReentryRewindsToAboutAFifth() {
         val start = PulseStyle.ARTIFACT.reentryStartTick(ageTicks = 40f, durationTicks = 20f)
-        assertEquals(40f - 20f * 0.22f, start)
+        assertEquals(40f - 20f * 0.22f, start, 1.0e-4f)
         val progress = (40f - start) / 20f
-        assertEquals(0.22f, progress)
+        assertEquals(0.22f, progress, 1.0e-4f)
     }
 }
