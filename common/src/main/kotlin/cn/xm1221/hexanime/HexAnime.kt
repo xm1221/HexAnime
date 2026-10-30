@@ -9,6 +9,7 @@ import cn.xm1221.hexanime.networking.HexAnimeNetworking
 import cn.xm1221.hexanime.staff.StaffAimRelay
 import cn.xm1221.hexanime.casting.AnimationPreferences
 import cn.xm1221.hexanime.casting.CastPulseRelay
+import cn.xm1221.hexanime.casting.OvercastStrainRelay
 import cn.xm1221.hexanime.casting.StaffCastRelay
 
 object HexAnime {
@@ -27,6 +28,7 @@ object HexAnime {
         AnimationPreferences.init()
         CastPulseRelay.init()
         StaffCastRelay.init()
+        OvercastStrainRelay.init()
         StaffAimRelay.init()
     }
 

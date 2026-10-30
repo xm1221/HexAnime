@@ -13,5 +13,6 @@ fun HexAnimeMessageS2C.applyOnClient(ctx: PacketContext) = ctx.queue {
 
         is MsgStaffAimS2C -> CastAnimationClient.onRemote(this)
         is MsgCastPulseS2C -> CastAnimationClient.onPulse(this)
+        is MsgOvercastStrainS2C -> CastAnimationClient.onOvercast(this)
     }
 }

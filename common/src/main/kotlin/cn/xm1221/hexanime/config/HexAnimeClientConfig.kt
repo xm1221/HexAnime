@@ -60,5 +60,19 @@ object HexAnimeClientConfig {
         @Tooltip
         var receiveRemoteEvents: Boolean = true
 
+        @Tooltip
+        var staffTipParticles: Boolean = true
+
+        @Tooltip
+        var mindspliceHeadPitch: Double = -0.28
+
+        @Tooltip
+        var quenchedTremor: Double = 0.016
+
+        @Tooltip
+        var quenchedStep: Double = 0.08
+
+        @Tooltip
+        var mindspliceDrift: Double = 0.03
     }
 }

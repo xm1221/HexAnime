@@ -11,6 +11,7 @@ import cn.xm1221.hexanime.client.anim.CastItemAnimation
 import cn.xm1221.hexanime.client.anim.CastItemLayer
 import cn.xm1221.hexanime.config.HexAnimeClientConfig
 import cn.xm1221.hexanime.networking.msg.MsgCastPulseS2C
+import cn.xm1221.hexanime.networking.msg.MsgOvercastStrainS2C
 import cn.xm1221.hexanime.networking.msg.MsgStaffAimS2C
 import dev.architectury.event.events.client.ClientTickEvent
 import dev.kosmx.playerAnim.minecraftApi.PlayerAnimationAccess
@@ -33,6 +34,7 @@ object CastAnimationClient {
             minecraft.level?.players()?.forEach { player ->
                 animation(player)?.observeHeldItems()
             }
+            StaffTipParticles.tick(minecraft)
         }
         HexAnime.LOGGER.info("Registered cast-item animation layer {}", LAYER_ID)
     }
@@ -65,6 +67,14 @@ object CastAnimationClient {
             strain = msg.strain,
             remote = true,
         )
+    }
+
+    fun onOvercast(msg: MsgOvercastStrainS2C) {
+        val minecraft = Minecraft.getInstance()
+        val entity = minecraft.level?.getEntity(msg.entityId) as? AbstractClientPlayer ?: return
+        val isSelf = minecraft.player?.id == msg.entityId
+        if (!HexAnimeClientConfig.config.receiveRemoteEvents && !isSelf) return
+        animation(entity)?.setOvercast(msg.strain)
     }
 
     fun onPulse(msg: MsgCastPulseS2C) {

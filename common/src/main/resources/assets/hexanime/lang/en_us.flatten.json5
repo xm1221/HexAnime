@@ -38,6 +38,26 @@
             "": "Receive cast events",
             "@Tooltip": "Allows release, damage, break and mishap animation events.",
           },
+          staffTipParticles: {
+            "": "Staff tip particles",
+            "@Tooltip": "Shows a few pigment-colored motes at the staff tip while overcast strain is high.",
+          },
+          mindspliceHeadPitch: {
+            "": "Mindsplice nod",
+            "@Tooltip": "Extra head pitch, in radians, at the peak of a mindsplice finishing flourish. Default -0.28.",
+          },
+          quenchedTremor: {
+            "": "Quenched shiver",
+            "@Tooltip": "Axial micro-vibration of a quenched staff, in radians. Zero turns it off.",
+          },
+          quenchedStep: {
+            "": "Quenched step",
+            "@Tooltip": "How coarsely a quenched staff's aim snaps, in cursor units.",
+          },
+          mindspliceDrift: {
+            "": "Mindsplice drift",
+            "@Tooltip": "How far a mindsplice staff wanders in the palm while aiming.",
+          },
         },
 
         server: {
