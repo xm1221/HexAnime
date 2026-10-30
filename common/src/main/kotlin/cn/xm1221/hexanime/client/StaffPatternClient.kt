@@ -15,6 +15,7 @@ import net.minecraft.world.InteractionHand
  * an in-progress cast flourish is left alone.
  */
 object StaffPatternClient {
+    @JvmStatic
     fun onServerView(success: Boolean, stackClear: Boolean) {
         if (!success) return
         val minecraft = Minecraft.getInstance()
