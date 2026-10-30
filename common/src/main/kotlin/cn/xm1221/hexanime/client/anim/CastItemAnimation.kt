@@ -120,6 +120,7 @@ class CastItemAnimation(
                 state.weight > 0.01f ||
                 isPulseActive(state) ||
                 microActive(state) ||
+                fatigueActive(state) ||
                 hasDamageMotion(state)
         }
     }
@@ -140,6 +141,9 @@ class CastItemAnimation(
             val desiredWeight = if (state.activeAim) 1f else 0f
             state.weight = Mth.lerp(STAFF_FADE_PER_TICK, state.weight, desiredWeight)
             if (!state.activeAim && state.weight < 0.01f) state.weight = 0f
+            val mishapNow = isPulseActive(state) && state.pulseKind == CastPulseKind.MISHAP
+            if (state.mishapWasActive && !mishapNow) state.fatigueStartTick = ageTicks
+            state.mishapWasActive = mishapNow
             stepAimSpring(state)
         }
     }
@@ -224,6 +228,19 @@ class CastItemAnimation(
         }
         val pulse = pulseMotion(state, phase)
         val micro = microPitch(state, phase)
+        val fatigue = FatigueCurve.envelope(phase - state.fatigueStartTick)
+        val ritual = if (profile.staffMaterial != StaffMaterial.NONE &&
+            (weight > 0.05f || isPulseActive(state))
+        ) {
+            OffhandRitual.poseFor(player, hand)
+        } else {
+            null
+        }
+        val ritualWeight = if (ritual == null) {
+            0f
+        } else {
+            maxOf(weight, if (isPulseActive(state)) 1f else 0f).coerceIn(0f, 1f)
+        }
         var itemX = pulse.itemX
         var itemY = pulse.itemY
         var itemZ = pulse.itemZ
@@ -244,13 +261,15 @@ class CastItemAnimation(
             aimPitch = aimPitch,
             aimRoll = 0f,
             bodyYawDelta = pulse.bodyYaw + (tremor.yaw + chaos.yaw) * 0.22f,
-            bodyPitchDelta = pulse.bodyPitch + damage * profile.damage.pitchDroop * 0.32f,
+            bodyPitchDelta = pulse.bodyPitch + damage * profile.damage.pitchDroop * 0.32f +
+                fatigue * FatigueCurve.BODY_DROOP,
             bodyRollDelta = pulse.bodyRoll + (tremor.roll + chaos.roll) * 0.18f,
             bodyXDelta = pulse.bodyX,
             bodyYDelta = pulse.bodyY,
             bodyZDelta = pulse.bodyZ,
             headYawDelta = pulse.headYaw - (tremor.yaw + chaos.yaw) * 0.32f,
-            headPitchDelta = pulse.headPitch - (tremor.pitch + chaos.pitch) * 0.24f,
+            headPitchDelta = pulse.headPitch - (tremor.pitch + chaos.pitch) * 0.24f +
+                fatigue * FatigueCurve.HEAD_DROOP,
             headRollDelta = pulse.headRoll - (tremor.roll + chaos.roll) * 0.42f,
             leftLegYawDelta = pulse.leftLegYaw,
             leftLegPitchDelta = pulse.leftLegPitch,
@@ -259,25 +278,66 @@ class CastItemAnimation(
             rightLegPitchDelta = pulse.rightLegPitch,
             rightLegRollDelta = pulse.rightLegRoll,
             armYawDelta = pulse.armYaw + tremor.yaw + chaos.yaw,
-            armPitchDelta = pulse.armPitch + tremor.pitch + chaos.pitch + damage * profile.damage.pitchDroop,
+            armPitchDelta = pulse.armPitch + tremor.pitch + chaos.pitch +
+                damage * profile.damage.pitchDroop + fatigue * FatigueCurve.ARM_DROOP,
             armRollDelta = pulse.armRoll + tremor.roll + chaos.roll,
             itemYawDelta = pulse.itemYaw + (tremor.yaw + chaos.yaw) * 0.82f,
-            itemPitchDelta = pulse.itemPitch + (tremor.pitch + chaos.pitch) * 0.82f + micro,
+            itemPitchDelta = pulse.itemPitch + (tremor.pitch + chaos.pitch) * 0.82f + micro +
+                fatigue * FatigueCurve.ITEM_DROOP,
             itemRollDelta = pulse.itemRoll + (tremor.roll + chaos.roll) * 1.35f,
             itemXDelta = itemX,
             itemYDelta = itemY,
             itemZDelta = itemZ,
-            offhandYawDelta = pulse.offhandYaw,
-            offhandPitchDelta = pulse.offhandPitch,
-            offhandRollDelta = pulse.offhandRoll,
+            offhandYawDelta = pulse.offhandYaw + (ritual?.yaw ?: 0f) * ritualWeight,
+            offhandPitchDelta = pulse.offhandPitch + (ritual?.pitch ?: 0f) * ritualWeight,
+            offhandRollDelta = pulse.offhandRoll + (ritual?.roll ?: 0f) * ritualWeight,
             firstPersonYaw = pulse.firstPersonYaw,
-            firstPersonPitch = pulse.firstPersonPitch + micro,
+            firstPersonPitch = pulse.firstPersonPitch + micro + fatigue * FatigueCurve.ITEM_DROOP,
             firstPersonRoll = pulse.firstPersonRoll,
             firstPersonX = pulse.firstPersonX,
             firstPersonY = pulse.firstPersonY,
             firstPersonZ = pulse.firstPersonZ,
             strain = strain,
             breakWave = pulse.breakWave,
+        ).limitTagged()
+    }
+
+    private fun CastHandFrame.limitTagged(): CastHandFrame {
+        if (profile?.staffMaterial != StaffMaterial.TAGGED) return this
+        return copy(
+            aimYaw = TaggedEnvelope.scaleRotation(aimYaw),
+            aimPitch = TaggedEnvelope.scaleRotation(aimPitch),
+            aimRoll = TaggedEnvelope.scaleRotation(aimRoll),
+            bodyYawDelta = TaggedEnvelope.scaleRotation(bodyYawDelta),
+            bodyPitchDelta = TaggedEnvelope.scaleRotation(bodyPitchDelta),
+            bodyRollDelta = TaggedEnvelope.scaleRotation(bodyRollDelta),
+            bodyXDelta = TaggedEnvelope.scalePosition(bodyXDelta),
+            bodyYDelta = TaggedEnvelope.scalePosition(bodyYDelta),
+            bodyZDelta = TaggedEnvelope.scalePosition(bodyZDelta),
+            headYawDelta = TaggedEnvelope.scaleRotation(headYawDelta),
+            headPitchDelta = TaggedEnvelope.scaleRotation(headPitchDelta),
+            headRollDelta = TaggedEnvelope.scaleRotation(headRollDelta),
+            leftLegYawDelta = TaggedEnvelope.scaleRotation(leftLegYawDelta),
+            leftLegPitchDelta = TaggedEnvelope.scaleRotation(leftLegPitchDelta),
+            leftLegRollDelta = TaggedEnvelope.scaleRotation(leftLegRollDelta),
+            rightLegYawDelta = TaggedEnvelope.scaleRotation(rightLegYawDelta),
+            rightLegPitchDelta = TaggedEnvelope.scaleRotation(rightLegPitchDelta),
+            rightLegRollDelta = TaggedEnvelope.scaleRotation(rightLegRollDelta),
+            armYawDelta = TaggedEnvelope.scaleRotation(armYawDelta),
+            armPitchDelta = TaggedEnvelope.scaleRotation(armPitchDelta),
+            armRollDelta = TaggedEnvelope.scaleRotation(armRollDelta),
+            itemYawDelta = TaggedEnvelope.scaleRotation(itemYawDelta),
+            itemPitchDelta = TaggedEnvelope.scaleRotation(itemPitchDelta),
+            itemRollDelta = TaggedEnvelope.scaleRotation(itemRollDelta),
+            itemXDelta = TaggedEnvelope.scalePosition(itemXDelta),
+            itemYDelta = TaggedEnvelope.scalePosition(itemYDelta),
+            itemZDelta = TaggedEnvelope.scalePosition(itemZDelta),
+            firstPersonYaw = TaggedEnvelope.scaleRotation(firstPersonYaw),
+            firstPersonPitch = TaggedEnvelope.scaleRotation(firstPersonPitch),
+            firstPersonRoll = TaggedEnvelope.scaleRotation(firstPersonRoll),
+            firstPersonX = TaggedEnvelope.scalePosition(firstPersonX),
+            firstPersonY = TaggedEnvelope.scalePosition(firstPersonY),
+            firstPersonZ = TaggedEnvelope.scalePosition(firstPersonZ),
         )
     }
 
@@ -695,6 +755,9 @@ class CastItemAnimation(
         }
     }
 
+    private fun fatigueActive(state: HandState): Boolean =
+        FatigueCurve.envelope(ageTicks - state.fatigueStartTick) > 0f
+
     private fun overcastNow(phase: Float): Float =
         OvercastStrain.remaining(overcastInitial, phase - overcastStartTick)
 
@@ -773,6 +836,8 @@ class CastItemAnimation(
         var pulseKind: CastPulseKind = CastPulseKind.CAST,
         var pulseStartTick: Float = -10_000f,
         var microStartTick: Float = -10_000f,
+        var mishapWasActive: Boolean = false,
+        var fatigueStartTick: Float = -10_000f,
     )
 
     private data class BoneRef(val hand: InteractionHand, val item: Boolean)
