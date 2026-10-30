@@ -56,6 +56,53 @@ data class VariantMotion(
     val secondaryBeat: Float = 0f,
 )
 
+/**
+ * How one packaged family rides the shared variant motions.
+ * Visual variant still picks the pose; the family only changes timing and whether a break is allowed.
+ */
+data class PulseStyle(
+    val durationScale: Float = 1f,
+    val castScale: Float = 1f,
+    val breakScale: Float = 1f,
+    val secondaryBeat: Float = 0f,
+    val allowBreak: Boolean = true,
+    val reentry: Boolean = false,
+    val reentryProgress: Float = 0.22f,
+) {
+    /** Progress is rewound to [reentryProgress] instead of restarting at zero. */
+    fun reentryStartTick(ageTicks: Float, durationTicks: Float): Float =
+        ageTicks - durationTicks * reentryProgress.coerceIn(0.05f, 0.8f)
+
+    companion object {
+        val DEFAULT = PulseStyle()
+
+        val CYPHER = PulseStyle(
+            durationScale = 0.78f,
+            castScale = 1.08f,
+            breakScale = 1.45f,
+            secondaryBeat = 0.06f,
+            allowBreak = true,
+        )
+
+        val TRINKET = PulseStyle(
+            durationScale = 1.18f,
+            castScale = 0.58f,
+            breakScale = 0f,
+            secondaryBeat = 0.55f,
+            allowBreak = false,
+        )
+
+        val ARTIFACT = PulseStyle(
+            durationScale = 1.28f,
+            castScale = 1.22f,
+            breakScale = 0f,
+            secondaryBeat = 0.36f,
+            allowBreak = false,
+            reentry = true,
+        )
+    }
+}
+
 /** Continuous feedback for low media or item durability. */
 data class DamagePose(
     val threshold: Float = 0.58f,
@@ -89,6 +136,7 @@ class CastItemProfile(
     val supportsPulse: Boolean,
     val damage: DamagePose,
     val staffMaterial: StaffMaterial = StaffMaterial.NONE,
+    val pulseStyle: PulseStyle = PulseStyle.DEFAULT,
     private val matcher: (ItemStack) -> Boolean,
 ) {
     fun matches(stack: ItemStack): Boolean = matcher(stack)

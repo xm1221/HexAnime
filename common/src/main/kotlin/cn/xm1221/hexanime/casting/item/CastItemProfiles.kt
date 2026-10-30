@@ -2,15 +2,19 @@ package cn.xm1221.hexanime.casting.item
 
 import at.petrak.hexcasting.api.mod.HexTags
 import at.petrak.hexcasting.common.items.ItemStaff
+import at.petrak.hexcasting.common.items.magic.ItemArtifact
+import at.petrak.hexcasting.common.items.magic.ItemCypher
 import at.petrak.hexcasting.common.items.magic.ItemPackagedHex
+import at.petrak.hexcasting.common.items.magic.ItemTrinket
 import cn.xm1221.hexanime.HexAnime
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.item.ItemStack
 
 /**
- * Ordered item-to-animation registry. Packaged Hex items all resolve to one family profile; their
- * visual Variant selects the motion. Third-party profiles can still override by priority.
+ * Ordered item-to-animation registry. Cypher (including ancient cyphers), trinkets and artifacts
+ * each have a family profile; the visual variant still selects the motion. Unknown packaged items
+ * fall back to one shared profile. Third-party profiles can still override by priority.
  */
 object CastItemProfiles {
     private val profiles = mutableListOf<CastItemProfile>()
@@ -20,12 +24,31 @@ object CastItemProfiles {
         if (bootstrapped) return
         bootstrapped = true
         register(
-            CastItemProfile(
-                id = HexAnime.id("packaged/hex"),
+            packagedProfile(
+                path = "packaged/cypher",
+                priority = 80,
+                style = PulseStyle.CYPHER,
+            ) { stack -> stack.item is ItemCypher },
+        )
+        register(
+            packagedProfile(
+                path = "packaged/trinket",
+                priority = 79,
+                style = PulseStyle.TRINKET,
+            ) { stack -> stack.item is ItemTrinket },
+        )
+        register(
+            packagedProfile(
+                path = "packaged/artifact",
+                priority = 78,
+                style = PulseStyle.ARTIFACT,
+            ) { stack -> stack.item is ItemArtifact },
+        )
+        register(
+            packagedProfile(
+                path = "packaged/hex",
                 priority = 70,
-                supportsAim = false,
-                supportsPulse = true,
-                damage = DamagePose(),
+                style = PulseStyle.DEFAULT,
             ) { stack -> stack.item is ItemPackagedHex },
         )
         register(
@@ -81,6 +104,21 @@ object CastItemProfiles {
         val location = ResourceLocation.tryParse(id) ?: return null
         return profiles.firstOrNull { it.id == location }
     }
+
+    private fun packagedProfile(
+        path: String,
+        priority: Int,
+        style: PulseStyle,
+        matcher: (ItemStack) -> Boolean,
+    ) = CastItemProfile(
+        id = HexAnime.id(path),
+        priority = priority,
+        supportsAim = false,
+        supportsPulse = true,
+        damage = DamagePose(),
+        pulseStyle = style,
+        matcher = matcher,
+    )
 
     private fun staffProfile(
         path: String,

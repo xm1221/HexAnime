@@ -5,6 +5,7 @@ import cn.xm1221.hexanime.casting.item.CastItemState
 import cn.xm1221.hexanime.casting.item.CastItems
 import cn.xm1221.hexanime.casting.item.CastPulseKind
 import cn.xm1221.hexanime.casting.item.DamagePose
+import cn.xm1221.hexanime.casting.item.PulseStyle
 import cn.xm1221.hexanime.casting.item.StaffCastMotions
 import cn.xm1221.hexanime.casting.item.StaffMaterial
 import cn.xm1221.hexanime.casting.item.VariantMotion
@@ -76,6 +77,7 @@ class CastItemAnimation(
         if (kind == CastPulseKind.CAST && !profile.supportsPulse) return
         val state = hands.getValue(hand)
         if (isPulseActive(state) && kind.priority < state.pulseKind.priority) return
+        if (kind == CastPulseKind.BREAK && !profile.pulseStyle.allowBreak) return
         if (kind == CastPulseKind.CAST &&
             profile.staffMaterial != StaffMaterial.NONE &&
             isPulseActive(state) &&
@@ -359,6 +361,7 @@ class CastItemAnimation(
             val previousProfile = state.profile
             if (state.hasSample &&
                 !state.packagedHex &&
+                previousProfile?.pulseStyle?.allowBreak != false &&
                 state.strain >= 0.92f &&
                 previousProfile != null &&
                 !isPulseActive(state)
@@ -387,6 +390,21 @@ class CastItemAnimation(
         strain: Float,
         kind: CastPulseKind,
     ) {
+        val style = profile.pulseStyle
+        if (style.reentry &&
+            kind == CastPulseKind.CAST &&
+            state.pulseKind == CastPulseKind.CAST &&
+            state.pulseProfile?.id == profile.id &&
+            isPulseActive(state)
+        ) {
+            val duration = pulseDurationTicks(state)
+            state.pulseProfile = profile
+            state.pulseVariant = variant.coerceAtLeast(0)
+            state.strain = strain.coerceIn(0f, 1f)
+            state.pulseKind = kind
+            state.pulseStartTick = style.reentryStartTick(ageTicks, duration)
+            return
+        }
         state.pulseProfile = profile
         state.pulseVariant = variant.coerceAtLeast(0)
         state.strain = strain.coerceIn(0f, 1f)
@@ -420,7 +438,7 @@ class CastItemAnimation(
         val motion = motionFor(state)
         val elapsed = phase - state.pulseStartTick
         val t = (elapsed / pulseDurationTicks(state)).coerceIn(0f, 1f)
-        val envelope = pulseEnvelope(state.pulseKind, motion, t)
+        val envelope = pulseEnvelope(state, state.pulseKind, motion, t)
         val chaos = if (state.pulseKind == CastPulseKind.MISHAP) {
             sin(t * PI * 7f).toFloat() * (1f - t) * 0.18f
         } else {
@@ -535,7 +553,7 @@ class CastItemAnimation(
         )
     }
 
-    private fun pulseEnvelope(kind: CastPulseKind, motion: VariantMotion, t: Float): Float {
+    private fun pulseEnvelope(state: HandState, kind: CastPulseKind, motion: VariantMotion, t: Float): Float {
         val anticipation = motion.anticipation.coerceIn(0.05f, 0.45f)
         val release = (anticipation + 0.12f).coerceAtMost(0.58f)
         val hold = (release + 0.16f).coerceAtMost(0.78f)
@@ -557,15 +575,17 @@ class CastItemAnimation(
                 lerp(HOLD_WEIGHT, 0f, k)
             }
         }
-        val secondary = if (motion.secondaryBeat > 0f && t in 0.42f..0.78f) {
+        val beat = maxOf(motion.secondaryBeat, stateStyle(state).secondaryBeat)
+        val secondary = if (beat > 0f && t in 0.42f..0.78f) {
             val k = (t - 0.42f) / 0.36f
-            sin(PI * k).toFloat() * motion.secondaryBeat * 0.18f
+            sin(PI * k).toFloat() * beat * 0.18f
         } else {
             0f
         }
+        val style = stateStyle(state)
         val kindScale = when (kind) {
-            CastPulseKind.CAST -> 1f
-            CastPulseKind.BREAK -> motion.breakScale()
+            CastPulseKind.CAST -> style.castScale
+            CastPulseKind.BREAK -> motion.breakScale() * style.breakScale
             CastPulseKind.DAMAGE -> 0.58f
             CastPulseKind.MISHAP -> 1.85f
         }
@@ -586,6 +606,9 @@ class CastItemAnimation(
         else -> 1.45f
     }
 
+    private fun stateStyle(state: HandState): PulseStyle =
+        state.pulseProfile?.pulseStyle ?: PulseStyle.DEFAULT
+
     private fun motionFor(state: HandState): VariantMotion {
         val profile = state.pulseProfile
         return if (profile != null && profile.staffMaterial != StaffMaterial.NONE) {
@@ -605,12 +628,12 @@ class CastItemAnimation(
     }
 
     private fun pulseDurationTicks(state: HandState): Float {
-        val base = motionFor(state).durationTicks
+        val base = motionFor(state).durationTicks * stateStyle(state).durationScale
         return when (state.pulseKind) {
-            CastPulseKind.MISHAP -> (base + 12).coerceAtLeast(28).toFloat()
-            CastPulseKind.BREAK -> (base + 4).toFloat()
+            CastPulseKind.MISHAP -> (base + 12f).coerceAtLeast(28f)
+            CastPulseKind.BREAK -> base + 4f
             CastPulseKind.DAMAGE -> (base * 0.65f).coerceAtLeast(10f)
-            CastPulseKind.CAST -> base.toFloat()
+            CastPulseKind.CAST -> base
         }
     }
 

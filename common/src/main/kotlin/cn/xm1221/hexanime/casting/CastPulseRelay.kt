@@ -54,6 +54,7 @@ object CastPulseRelay {
             CastPulseKind.MISHAP -> if (!config.mishapPulse) return
             CastPulseKind.DAMAGE -> return
         }
+        if (kind == CastPulseKind.BREAK && !state.profile.pulseStyle.allowBreak) return
 
         val variant = when {
             variantOverride != null -> variantOverride.coerceAtLeast(0)
