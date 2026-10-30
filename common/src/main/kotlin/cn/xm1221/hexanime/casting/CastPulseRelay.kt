@@ -2,8 +2,11 @@ package cn.xm1221.hexanime.casting
 
 import cn.xm1221.hexanime.casting.item.CastItems
 import cn.xm1221.hexanime.casting.item.CastPulseKind
+import cn.xm1221.hexanime.casting.item.StaffCastMotions
+import cn.xm1221.hexanime.casting.item.StaffMaterial
 import cn.xm1221.hexanime.config.HexAnimeServerConfig
 import cn.xm1221.hexanime.networking.msg.MsgCastPulseS2C
+import cn.xm1221.hexanime.staff.StaffAimRelay
 import dev.architectury.event.events.common.PlayerEvent
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionHand
@@ -19,7 +22,13 @@ object CastPulseRelay {
     }
 
     @JvmStatic
-    fun broadcast(player: ServerPlayer, hand: InteractionHand, kind: CastPulseKind) {
+    @JvmOverloads
+    fun broadcast(
+        player: ServerPlayer,
+        hand: InteractionHand,
+        kind: CastPulseKind,
+        variantOverride: Int? = null,
+    ) {
         val now = System.nanoTime()
         if (kind == CastPulseKind.MISHAP) {
             recentMishapUntil[player.uuid] = now + MISHAP_SUPPRESSION_NANOS
@@ -31,23 +40,35 @@ object CastPulseRelay {
 
         val config = HexAnimeServerConfig.config
         if (!config.enabled) return
-        when (kind) {
-            CastPulseKind.CAST, CastPulseKind.BREAK -> if (!config.packagedHexPulse) return
-            CastPulseKind.MISHAP -> if (!config.mishapPulse) return
-            CastPulseKind.DAMAGE -> return
-        }
 
         val held = player.getItemInHand(hand)
         // A breaking stack may have count zero while retaining item identity and components.
         val sample = held.copy().also { it.count = 1 }
         val state = CastItems.snapshot(sample) ?: return
-        if (!state.packagedHex && kind in setOf(CastPulseKind.CAST, CastPulseKind.BREAK)) return
+        val staff = !state.packagedHex && state.profile.staffMaterial != StaffMaterial.NONE
+        when (kind) {
+            CastPulseKind.CAST, CastPulseKind.BREAK -> {
+                val allowed = if (staff) config.staffPulse else if (state.packagedHex) config.packagedHexPulse else false
+                if (!allowed) return
+            }
+            CastPulseKind.MISHAP -> if (!config.mishapPulse) return
+            CastPulseKind.DAMAGE -> return
+        }
+
+        val variant = when {
+            variantOverride != null -> variantOverride.coerceAtLeast(0)
+            staff && kind == CastPulseKind.CAST -> {
+                val (normX, normY) = StaffAimRelay.lastCursor(player)
+                StaffCastMotions.variantForCursor(normX, normY)
+            }
+            else -> state.variant
+        }
 
         val msg = MsgCastPulseS2C(
             entityId = player.id,
             hand = hand,
             profileId = state.profile.id.toString(),
-            variant = state.variant,
+            variant = variant,
             strain = state.strain,
             kind = kind.networkId,
         )

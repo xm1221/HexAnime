@@ -31,14 +31,19 @@ object StaffAimRelay {
 
     private val published = HashMap<UUID, Published>()
     private val lastAcceptedNanos = HashMap<UUID, Long>()
+    private val cursor = HashMap<UUID, Pair<Float, Float>>()
 
     fun init() {
         PlayerEvent.PLAYER_QUIT.register { player ->
             published.remove(player.uuid)
             lastAcceptedNanos.remove(player.uuid)
+            cursor.remove(player.uuid)
         }
         TickEvent.SERVER_POST.register(::refresh)
     }
+
+    /** Last raw cursor accepted while aiming. Closing the grid does not wipe it. */
+    fun lastCursor(player: ServerPlayer): Pair<Float, Float> = cursor[player.uuid] ?: (0f to 0f)
 
     fun handle(player: ServerPlayer, msg: MsgStaffAimC2S) {
         val config = HexAnimeServerConfig.config
@@ -71,6 +76,7 @@ object StaffAimRelay {
             return
         }
 
+        if (active) cursor[player.uuid] = normX to normY
         val next = Published(
             active = active,
             normX = if (active) normX else 0f,

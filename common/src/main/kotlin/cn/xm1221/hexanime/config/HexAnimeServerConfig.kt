@@ -62,6 +62,9 @@ object HexAnimeServerConfig {
         var packagedHexPulse: Boolean = true
 
         @Tooltip
+        var staffPulse: Boolean = true
+
+        @Tooltip
         var mishapPulse: Boolean = true
 
         @Tooltip
@@ -86,6 +89,7 @@ object HexAnimeServerConfig {
             buf.writeBoolean(mishapPulse)
             buf.writeVarInt(refreshTicks())
             buf.writeVarInt(maxUpdatesPerSecond.coerceIn(1, 40))
+            buf.writeBoolean(staffPulse)
         }
 
         companion object {
@@ -96,6 +100,7 @@ object HexAnimeServerConfig {
                 it.mishapPulse = buf.readBoolean()
                 it.refreshIntervalTicks = buf.readVarInt()
                 it.maxUpdatesPerSecond = buf.readVarInt()
+                it.staffPulse = buf.readBoolean()
             }
         }
     }

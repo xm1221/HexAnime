@@ -7,9 +7,11 @@
     "client.CameraAccessor",
     "client.CameraMixin",
     "client.GuiSpellcastingAccessor",
-    "client.ItemInHandRendererMixin"
+    "client.ItemInHandRendererMixin",
+    "client.MsgNewSpellPatternMixin"
   ],
   "mixins": [
+    "AttemptSpellMixin",
     "MishapSideEffectMixin",
     "PackagedHexUseMixin",
     "PackagedHexUseAnimationMixin"

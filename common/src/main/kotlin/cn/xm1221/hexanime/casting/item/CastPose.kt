@@ -3,6 +3,15 @@ package cn.xm1221.hexanime.casting.item
 import net.minecraft.resources.ResourceLocation
 import net.minecraft.world.item.ItemStack
 
+/** Which staff body the display layer and flourish table should use. */
+enum class StaffMaterial {
+    NONE,
+    WOOD,
+    QUENCHED,
+    MINDSPLICE,
+    TAGGED,
+}
+
 /**
  * A complete full-body cast motion. Packaged Hex items select one of these by [variant], never by
  * item class, so all artifacts/cyphers/trinkets with the same visual variant move coherently.
@@ -79,6 +88,7 @@ class CastItemProfile(
     val supportsAim: Boolean,
     val supportsPulse: Boolean,
     val damage: DamagePose,
+    val staffMaterial: StaffMaterial = StaffMaterial.NONE,
     private val matcher: (ItemStack) -> Boolean,
 ) {
     fun matches(stack: ItemStack): Boolean = matcher(stack)

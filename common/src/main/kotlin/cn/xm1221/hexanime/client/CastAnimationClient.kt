@@ -91,6 +91,8 @@ object CastAnimationClient {
     fun isMishapActive(player: AbstractClientPlayer, hand: InteractionHand): Boolean =
         animation(player)?.isMishapActive(hand) == true
 
+    fun animationOf(player: AbstractClientPlayer): CastItemAnimation? = animation(player)
+
     private fun animation(player: AbstractClientPlayer): CastItemAnimation? {
         val found = PlayerAnimationAccess.getPlayerAssociatedData(player).get(LAYER_ID)
         return (found as? CastItemLayer)?.animation

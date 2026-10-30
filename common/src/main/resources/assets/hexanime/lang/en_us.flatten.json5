@@ -20,7 +20,7 @@
           },
           cameraShake: {
             "": "Camera shake",
-            "@Tooltip": "Adds a brief view shake on breaks and casting mishaps.",
+            "@Tooltip": "Adds a brief view hit on staff casts, breaks and casting mishaps.",
           },
           firstPersonAnimations: {
             "": "First-person animations",
@@ -52,6 +52,10 @@
           packagedHexPulse: {
             "": "Packaged Hex pulse sync",
             "@Tooltip": "Broadcasts use and depletion animations for cyphers, trinkets and artifacts.",
+          },
+          staffPulse: {
+            "": "Staff cast pulse sync",
+            "@Tooltip": "Broadcasts the staff finishing flourish when a spell with a casting sound resolves.",
           },
           mishapPulse: {
             "": "Mishap animation sync",

@@ -33,24 +33,25 @@ object CastItemProfiles {
                 "staff/quenched",
                 priority = 60,
                 damage = DamagePose(threshold = 0.55f, tremorRoll = 0.07f),
-            ) { stack -> idOf(stack).path == "staff/quenched" },
+                material = StaffMaterial.QUENCHED,
+            ) { stack -> idOf(stack).path == StaffIds.QUENCHED },
         )
         register(
             staffProfile(
                 "staff/mindsplice",
                 priority = 59,
                 damage = DamagePose(frequency = 1.05f, tremorRoll = 0.08f),
-            ) { stack -> idOf(stack).path == "staff/mindsplice" },
+                material = StaffMaterial.MINDSPLICE,
+            ) { stack -> idOf(stack).path == StaffIds.MINDSPLICE },
         )
         register(
             staffProfile(
                 "staff/wood",
                 priority = 40,
                 damage = DamagePose(),
+                material = StaffMaterial.WOOD,
             ) { stack ->
-                stack.item is ItemStaff &&
-                    idOf(stack).path != "staff/quenched" &&
-                    idOf(stack).path != "staff/mindsplice"
+                stack.item is ItemStaff && !StaffIds.isOrnate(idOf(stack).path)
             },
         )
         register(
@@ -58,6 +59,7 @@ object CastItemProfiles {
                 "staff/tagged",
                 priority = 20,
                 damage = DamagePose(),
+                material = StaffMaterial.TAGGED,
             ) { stack -> stack.`is`(HexTags.Items.STAVES) },
         )
     }
@@ -84,13 +86,15 @@ object CastItemProfiles {
         path: String,
         priority: Int,
         damage: DamagePose,
+        material: StaffMaterial,
         matcher: (ItemStack) -> Boolean,
     ) = CastItemProfile(
         id = HexAnime.id(path),
         priority = priority,
         supportsAim = true,
-        supportsPulse = false,
+        supportsPulse = true,
         damage = damage,
+        staffMaterial = material,
         matcher = matcher,
     )
 

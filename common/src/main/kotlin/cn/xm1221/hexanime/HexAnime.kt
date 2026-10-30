@@ -9,6 +9,7 @@ import cn.xm1221.hexanime.networking.HexAnimeNetworking
 import cn.xm1221.hexanime.staff.StaffAimRelay
 import cn.xm1221.hexanime.casting.AnimationPreferences
 import cn.xm1221.hexanime.casting.CastPulseRelay
+import cn.xm1221.hexanime.casting.StaffCastRelay
 
 object HexAnime {
     const val MODID = "hexanime"
@@ -25,6 +26,7 @@ object HexAnime {
         HexAnimeNetworking.init()
         AnimationPreferences.init()
         CastPulseRelay.init()
+        StaffCastRelay.init()
         StaffAimRelay.init()
     }
 

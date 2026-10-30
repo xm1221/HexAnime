@@ -13,6 +13,9 @@ object CameraShakeClient {
     private var durationNanos = 0L
     private var yawAmplitude = 0f
     private var pitchAmplitude = 0f
+    private var yawCycles = 9.0
+    private var pitchCycles = 12.0
+    private var pitchPhase = 1.3
 
     fun trigger(kind: CastPulseKind) {
         val config = HexAnimeClientConfig.config
@@ -22,11 +25,26 @@ object CameraShakeClient {
                 durationNanos = 700_000_000L
                 yawAmplitude = 4.8f
                 pitchAmplitude = 3.4f
+                yawCycles = 9.0
+                pitchCycles = 12.0
+                pitchPhase = 1.3
             }
             CastPulseKind.BREAK -> {
                 durationNanos = 350_000_000L
                 yawAmplitude = 1.8f
                 pitchAmplitude = 1.2f
+                yawCycles = 7.0
+                pitchCycles = 9.0
+                pitchPhase = 1.1
+            }
+            // Wood-staff cast hit: short rotational impulse, not a long wobble.
+            CastPulseKind.CAST -> {
+                durationNanos = 220_000_000L
+                yawAmplitude = 1.15f
+                pitchAmplitude = 0.70f
+                yawCycles = 2.0
+                pitchCycles = 2.0
+                pitchPhase = 0.4
             }
             else -> return
         }
@@ -46,9 +64,9 @@ object CameraShakeClient {
             return
         }
         val progress = elapsed.toFloat() / durationNanos
-        val fade = (1f - progress) * (1f - progress)
-        val yawOffset = sin(progress * PI * 9.0).toFloat() * yawAmplitude * fade
-        val pitchOffset = sin(progress * PI * 12.0 + 1.3).toFloat() * pitchAmplitude * fade
+        val fade = CameraShakeCurves.attackFade(progress)
+        val yawOffset = sin(progress * PI * yawCycles).toFloat() * yawAmplitude * fade
+        val pitchOffset = sin(progress * PI * pitchCycles + pitchPhase).toFloat() * pitchAmplitude * fade
         val accessor = camera as CameraAccessor
         accessor.`hexanime$setRotation`(
             camera.getYRot() + yawOffset,

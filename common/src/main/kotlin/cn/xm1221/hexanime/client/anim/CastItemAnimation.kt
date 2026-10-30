@@ -5,6 +5,8 @@ import cn.xm1221.hexanime.casting.item.CastItemState
 import cn.xm1221.hexanime.casting.item.CastItems
 import cn.xm1221.hexanime.casting.item.CastPulseKind
 import cn.xm1221.hexanime.casting.item.DamagePose
+import cn.xm1221.hexanime.casting.item.StaffCastMotions
+import cn.xm1221.hexanime.casting.item.StaffMaterial
 import cn.xm1221.hexanime.casting.item.VariantMotion
 import cn.xm1221.hexanime.casting.item.VariantMotions
 import cn.xm1221.hexanime.config.HexAnimeClientConfig
@@ -74,7 +76,30 @@ class CastItemAnimation(
         if (kind == CastPulseKind.CAST && !profile.supportsPulse) return
         val state = hands.getValue(hand)
         if (isPulseActive(state) && kind.priority < state.pulseKind.priority) return
+        if (kind == CastPulseKind.CAST &&
+            profile.staffMaterial != StaffMaterial.NONE &&
+            isPulseActive(state) &&
+            state.pulseKind == CastPulseKind.CAST
+        ) {
+            return
+        }
         triggerPulseInternal(state, profile, variant, strain, kind)
+    }
+
+    /** Four-tick local dip when Hex accepts a drawn pattern. Not a networked flourish. */
+    fun triggerMicroPulse(hand: InteractionHand) {
+        hands.getValue(hand).microStartTick = ageTicks
+    }
+
+    /**
+     * Backup finish when the stack clears without an in-progress cast flourish.
+     * Uses the raw aim target, not the displayed spring.
+     */
+    fun triggerLocalStaffCast(hand: InteractionHand, profile: CastItemProfile, strain: Float) {
+        if (profile.staffMaterial == StaffMaterial.NONE || !profile.supportsPulse) return
+        val state = hands.getValue(hand)
+        val variant = StaffCastMotions.variantForCursor(state.targetX, state.targetY)
+        triggerPulse(hand, profile, variant, strain, CastPulseKind.CAST)
     }
 
     override fun isActive(): Boolean {
@@ -83,6 +108,7 @@ class CastItemAnimation(
             state.activeAim ||
                 state.weight > 0.01f ||
                 isPulseActive(state) ||
+                microActive(state) ||
                 hasDamageMotion(state)
         }
     }
@@ -134,6 +160,7 @@ class CastItemAnimation(
         val damage = if (config.damageAnimations) damageState(profile.damage, state.strain) else 0f
         val tremor = damageTremor(profile.damage, damage, phase, state.variant)
         val pulse = pulseMotion(state, phase)
+        val micro = microPitch(state, phase)
 
         return CastHandFrame(
             profile = profile,
@@ -161,7 +188,7 @@ class CastItemAnimation(
             armPitchDelta = pulse.armPitch + tremor.pitch + damage * profile.damage.pitchDroop,
             armRollDelta = pulse.armRoll + tremor.roll,
             itemYawDelta = pulse.itemYaw + tremor.yaw * 0.82f,
-            itemPitchDelta = pulse.itemPitch + tremor.pitch * 0.82f,
+            itemPitchDelta = pulse.itemPitch + tremor.pitch * 0.82f + micro,
             itemRollDelta = pulse.itemRoll + tremor.roll * 1.35f,
             itemXDelta = pulse.itemX,
             itemYDelta = pulse.itemY,
@@ -170,7 +197,7 @@ class CastItemAnimation(
             offhandPitchDelta = pulse.offhandPitch,
             offhandRollDelta = pulse.offhandRoll,
             firstPersonYaw = pulse.firstPersonYaw,
-            firstPersonPitch = pulse.firstPersonPitch,
+            firstPersonPitch = pulse.firstPersonPitch + micro,
             firstPersonRoll = pulse.firstPersonRoll,
             firstPersonX = pulse.firstPersonX,
             firstPersonY = pulse.firstPersonY,
@@ -390,7 +417,7 @@ class CastItemAnimation(
 
     private fun pulseMotion(state: HandState, phase: Float): PulseMotion {
         if (!isPulseActive(state)) return PulseMotion.NONE
-        val motion = VariantMotions.byVariant(state.pulseVariant)
+        val motion = motionFor(state)
         val elapsed = phase - state.pulseStartTick
         val t = (elapsed / pulseDurationTicks(state)).coerceIn(0f, 1f)
         val envelope = pulseEnvelope(state.pulseKind, motion, t)
@@ -559,8 +586,26 @@ class CastItemAnimation(
         else -> 1.45f
     }
 
+    private fun motionFor(state: HandState): VariantMotion {
+        val profile = state.pulseProfile
+        return if (profile != null && profile.staffMaterial != StaffMaterial.NONE) {
+            StaffCastMotions.byVariant(state.pulseVariant)
+        } else {
+            VariantMotions.byVariant(state.pulseVariant)
+        }
+    }
+
+    private fun microActive(state: HandState): Boolean =
+        ageTicks - state.microStartTick in 0f..MICRO_PULSE_TICKS
+
+    private fun microPitch(state: HandState, phase: Float): Float {
+        val elapsed = phase - state.microStartTick
+        if (elapsed < 0f || elapsed > MICRO_PULSE_TICKS) return 0f
+        return sin((elapsed / MICRO_PULSE_TICKS) * PI.toFloat()) * MICRO_PULSE_PITCH
+    }
+
     private fun pulseDurationTicks(state: HandState): Float {
-        val base = VariantMotions.byVariant(state.pulseVariant).durationTicks
+        val base = motionFor(state).durationTicks
         return when (state.pulseKind) {
             CastPulseKind.MISHAP -> (base + 12).coerceAtLeast(28).toFloat()
             CastPulseKind.BREAK -> (base + 4).toFloat()
@@ -616,6 +661,7 @@ class CastItemAnimation(
         var pulseVariant: Int = 0,
         var pulseKind: CastPulseKind = CastPulseKind.CAST,
         var pulseStartTick: Float = -10_000f,
+        var microStartTick: Float = -10_000f,
     )
 
     private data class BoneRef(val hand: InteractionHand, val item: Boolean)
@@ -717,6 +763,8 @@ class CastItemAnimation(
         private const val STAFF_FADE_PER_TICK = 0.22f
         private const val STAFF_YAW_SPREAD = 0.32f
         private const val STAFF_PITCH_SPREAD = 0.24f
+        private const val MICRO_PULSE_TICKS = 4f
+        private const val MICRO_PULSE_PITCH = -0.10f
     }
 }
 
