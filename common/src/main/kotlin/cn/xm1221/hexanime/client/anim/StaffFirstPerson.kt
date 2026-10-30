@@ -30,12 +30,20 @@ object StaffFirstPerson {
         val frame = CastAnimationClient.frame(player, hand, partialTick)
         if (frame.profile?.supportsAim != true || frame.aimWeight <= 0.001f) return false
 
-        val yaw = frame.aimYaw / MODEL_YAW_SPREAD * YAW_SPREAD * frame.aimWeight
+        val rot = FirstPersonEnvelope.ROTATION
+        val pos = FirstPersonEnvelope.TRANSLATION
+        val yaw = frame.aimYaw / MODEL_YAW_SPREAD * YAW_SPREAD * frame.aimWeight * rot
         val pitch = BASE_VERTICAL_PITCH * frame.aimWeight +
-            frame.aimPitch / MODEL_PITCH_SPREAD * PITCH_SPREAD * frame.aimWeight
+            frame.aimPitch / MODEL_PITCH_SPREAD * PITCH_SPREAD * frame.aimWeight * rot
         poseStack.pushPose()
-        poseStack.mulPose(Axis.YP.rotation(yaw))
-        poseStack.mulPose(Axis.XP.rotation(pitch))
+        poseStack.translate(
+            frame.firstPersonX * pos,
+            frame.firstPersonY * pos,
+            frame.firstPersonZ * pos,
+        )
+        poseStack.mulPose(Axis.YP.rotation(yaw + frame.firstPersonYaw * rot))
+        poseStack.mulPose(Axis.XP.rotation(pitch + frame.firstPersonPitch * rot))
+        poseStack.mulPose(Axis.ZP.rotation(frame.firstPersonRoll * rot))
         return true
     }
 }

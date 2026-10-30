@@ -1,5 +1,6 @@
 package cn.xm1221.hexanime.client.anim
 
+import cn.xm1221.hexanime.casting.OvercastStrain
 import cn.xm1221.hexanime.casting.item.CastItemProfile
 import cn.xm1221.hexanime.casting.item.CastItemState
 import cn.xm1221.hexanime.casting.item.CastItems
@@ -18,6 +19,7 @@ import dev.kosmx.playerAnim.api.firstPerson.FirstPersonConfiguration
 import dev.kosmx.playerAnim.api.layered.IAnimation
 import dev.kosmx.playerAnim.api.layered.ModifierLayer
 import dev.kosmx.playerAnim.core.util.Vec3f
+import net.minecraft.client.Minecraft
 import net.minecraft.client.player.AbstractClientPlayer
 import net.minecraft.util.Mth
 import net.minecraft.world.InteractionHand
@@ -30,6 +32,8 @@ class CastItemAnimation(
 ) : IAnimation {
     private val hands = InteractionHand.values().associateWith { HandState() }
     private var ageTicks = 0f
+    private var overcastInitial = 0f
+    private var overcastStartTick = -10_000f
 
     fun setAim(
         active: Boolean,
@@ -89,6 +93,11 @@ class CastItemAnimation(
     }
 
     /** Four-tick local dip when Hex accepts a drawn pattern. Not a networked flourish. */
+    fun setOvercast(strain: Float) {
+        overcastInitial = strain.coerceIn(0f, 1f)
+        overcastStartTick = ageTicks
+    }
+
     fun triggerMicroPulse(hand: InteractionHand) {
         hands.getValue(hand).microStartTick = ageTicks
     }
@@ -131,11 +140,48 @@ class CastItemAnimation(
             val desiredWeight = if (state.activeAim) 1f else 0f
             state.weight = Mth.lerp(STAFF_FADE_PER_TICK, state.weight, desiredWeight)
             if (!state.activeAim && state.weight < 0.01f) state.weight = 0f
-            if (state.activeAim) {
-                state.shownX = Mth.lerp(STAFF_AIM_PER_TICK, state.shownX, state.targetX)
-                state.shownY = Mth.lerp(STAFF_AIM_PER_TICK, state.shownY, state.targetY)
-            }
+            stepAimSpring(state)
         }
+    }
+
+    /** Display follow only. [HandState.targetX] stays the raw sample used for flourishes and the network. */
+    private fun stepAimSpring(state: HandState) {
+        val material = state.profile?.staffMaterial ?: StaffMaterial.NONE
+        val moving = state.activeAim ||
+            abs(state.shownX) > 0.001f || abs(state.shownY) > 0.001f ||
+            abs(state.velX) > 0.001f || abs(state.velY) > 0.001f
+        if (material == StaffMaterial.NONE || !moving) {
+            if (!state.activeAim) {
+                state.shownX = 0f
+                state.shownY = 0f
+                state.velX = 0f
+                state.velY = 0f
+            }
+            return
+        }
+        val params = StaffSprings.forMaterial(material)
+        val targetX = if (state.activeAim) state.targetX else 0f
+        val targetY = if (state.activeAim) state.targetY else 0f
+        val nextX = SpringDamper.step(
+            position = state.shownX,
+            velocity = state.velX,
+            target = targetX,
+            stiffness = params.stiffness,
+            dampingRatio = params.dampingRatio,
+            dt = SpringDamper.TICK_DT,
+        )
+        val nextY = SpringDamper.step(
+            position = state.shownY,
+            velocity = state.velY,
+            target = targetY,
+            stiffness = params.stiffness,
+            dampingRatio = params.dampingRatio,
+            dt = SpringDamper.TICK_DT,
+        )
+        state.shownX = nextX.position
+        state.velX = nextX.velocity
+        state.shownY = nextY.position
+        state.velY = nextY.velocity
     }
 
     /** Called from the client tick as well, so low-media feedback can activate an idle layer. */
@@ -153,16 +199,42 @@ class CastItemAnimation(
 
         val state = hands.getValue(hand)
         val profile = state.profile ?: return CastHandFrame.EMPTY
-        val x = Mth.lerp(tickDelta, state.prevX, state.shownX)
-        val y = Mth.lerp(tickDelta, state.prevY, state.shownY)
+        var x = Mth.lerp(tickDelta, state.prevX, state.shownX)
+        var y = Mth.lerp(tickDelta, state.prevY, state.shownY)
+        if (profile.staffMaterial == StaffMaterial.QUENCHED) {
+            val step = StaffDisplayTuning.quenchedStep()
+            x = StaffDisplay.quantize(x, step)
+            y = StaffDisplay.quantize(y, step)
+        }
         val weight = Mth.lerp(tickDelta, state.prevWeight, state.weight)
         val aimYaw = if (profile.supportsAim) -x * STAFF_YAW_SPREAD else 0f
         val aimPitch = if (profile.supportsAim) y * STAFF_PITCH_SPREAD else 0f
         val phase = ageTicks + tickDelta
-        val damage = if (config.damageAnimations) damageState(profile.damage, state.strain) else 0f
+        val strain = if (profile.staffMaterial == StaffMaterial.NONE) {
+            state.strain
+        } else {
+            maxOf(state.strain, overcastNow(phase))
+        }
+        val damage = if (config.damageAnimations) damageState(profile.damage, strain) else 0f
         val tremor = damageTremor(profile.damage, damage, phase, state.variant)
+        val chaos = if (profile.staffMaterial == StaffMaterial.NONE) {
+            Tremor.NONE
+        } else {
+            StaffDisplay.chaos(strain, phase).let { Tremor(it.yaw, it.pitch, it.roll) }
+        }
         val pulse = pulseMotion(state, phase)
         val micro = microPitch(state, phase)
+        var itemX = pulse.itemX
+        var itemY = pulse.itemY
+        var itemZ = pulse.itemZ
+        if (profile.staffMaterial == StaffMaterial.QUENCHED) {
+            itemZ += kotlin.math.sin(phase * 2.4f) * StaffDisplayTuning.quenchedTremor()
+        }
+        if (profile.staffMaterial == StaffMaterial.MINDSPLICE) {
+            val drift = StaffDisplay.drift(phase, StaffDisplayTuning.mindspliceDrift() * weight.coerceIn(0f, 1f))
+            itemX += drift.first
+            itemY += drift.second
+        }
 
         return CastHandFrame(
             profile = profile,
@@ -171,30 +243,30 @@ class CastItemAnimation(
             aimYaw = aimYaw,
             aimPitch = aimPitch,
             aimRoll = 0f,
-            bodyYawDelta = pulse.bodyYaw + tremor.yaw * 0.22f,
+            bodyYawDelta = pulse.bodyYaw + (tremor.yaw + chaos.yaw) * 0.22f,
             bodyPitchDelta = pulse.bodyPitch + damage * profile.damage.pitchDroop * 0.32f,
-            bodyRollDelta = pulse.bodyRoll + tremor.roll * 0.18f,
+            bodyRollDelta = pulse.bodyRoll + (tremor.roll + chaos.roll) * 0.18f,
             bodyXDelta = pulse.bodyX,
             bodyYDelta = pulse.bodyY,
             bodyZDelta = pulse.bodyZ,
-            headYawDelta = pulse.headYaw - tremor.yaw * 0.32f,
-            headPitchDelta = pulse.headPitch - tremor.pitch * 0.24f,
-            headRollDelta = pulse.headRoll - tremor.roll * 0.42f,
+            headYawDelta = pulse.headYaw - (tremor.yaw + chaos.yaw) * 0.32f,
+            headPitchDelta = pulse.headPitch - (tremor.pitch + chaos.pitch) * 0.24f,
+            headRollDelta = pulse.headRoll - (tremor.roll + chaos.roll) * 0.42f,
             leftLegYawDelta = pulse.leftLegYaw,
             leftLegPitchDelta = pulse.leftLegPitch,
             leftLegRollDelta = pulse.leftLegRoll,
             rightLegYawDelta = pulse.rightLegYaw,
             rightLegPitchDelta = pulse.rightLegPitch,
             rightLegRollDelta = pulse.rightLegRoll,
-            armYawDelta = pulse.armYaw + tremor.yaw,
-            armPitchDelta = pulse.armPitch + tremor.pitch + damage * profile.damage.pitchDroop,
-            armRollDelta = pulse.armRoll + tremor.roll,
-            itemYawDelta = pulse.itemYaw + tremor.yaw * 0.82f,
-            itemPitchDelta = pulse.itemPitch + tremor.pitch * 0.82f + micro,
-            itemRollDelta = pulse.itemRoll + tremor.roll * 1.35f,
-            itemXDelta = pulse.itemX,
-            itemYDelta = pulse.itemY,
-            itemZDelta = pulse.itemZ,
+            armYawDelta = pulse.armYaw + tremor.yaw + chaos.yaw,
+            armPitchDelta = pulse.armPitch + tremor.pitch + chaos.pitch + damage * profile.damage.pitchDroop,
+            armRollDelta = pulse.armRoll + tremor.roll + chaos.roll,
+            itemYawDelta = pulse.itemYaw + (tremor.yaw + chaos.yaw) * 0.82f,
+            itemPitchDelta = pulse.itemPitch + (tremor.pitch + chaos.pitch) * 0.82f + micro,
+            itemRollDelta = pulse.itemRoll + (tremor.roll + chaos.roll) * 1.35f,
+            itemXDelta = itemX,
+            itemYDelta = itemY,
+            itemZDelta = itemZ,
             offhandYawDelta = pulse.offhandYaw,
             offhandPitchDelta = pulse.offhandPitch,
             offhandRollDelta = pulse.offhandRoll,
@@ -204,7 +276,7 @@ class CastItemAnimation(
             firstPersonX = pulse.firstPersonX,
             firstPersonY = pulse.firstPersonY,
             firstPersonZ = pulse.firstPersonZ,
-            strain = state.strain,
+            strain = strain,
             breakWave = pulse.breakWave,
         )
     }
@@ -215,27 +287,28 @@ class CastItemAnimation(
         tickDelta: Float,
         value0: Vec3f,
     ): Vec3f {
+        val (rotScale, posScale) = localFirstPersonScales()
         if (modelName == BODY || modelName == HEAD) {
             val frames = hands.keys.map { frame(it, tickDelta) }
             if (type == TransformType.POSITION && modelName == BODY) {
                 return Vec3f(
-                    value0.x + frames.sumOf { it.bodyXDelta.toDouble() }.toFloat(),
-                    value0.y + frames.sumOf { it.bodyYDelta.toDouble() }.toFloat(),
-                    value0.z + frames.sumOf { it.bodyZDelta.toDouble() }.toFloat(),
+                    value0.x + frames.sumOf { it.bodyXDelta.toDouble() }.toFloat() * posScale,
+                    value0.y + frames.sumOf { it.bodyYDelta.toDouble() }.toFloat() * posScale,
+                    value0.z + frames.sumOf { it.bodyZDelta.toDouble() }.toFloat() * posScale,
                 )
             }
             if (type != TransformType.ROTATION) return value0
             return if (modelName == HEAD) {
                 Vec3f(
-                    value0.x + frames.sumOf { it.headPitchDelta.toDouble() }.toFloat(),
-                    value0.y + frames.sumOf { it.headYawDelta.toDouble() }.toFloat(),
-                    value0.z + frames.sumOf { it.headRollDelta.toDouble() }.toFloat(),
+                    value0.x + frames.sumOf { it.headPitchDelta.toDouble() }.toFloat() * rotScale,
+                    value0.y + frames.sumOf { it.headYawDelta.toDouble() }.toFloat() * rotScale,
+                    value0.z + frames.sumOf { it.headRollDelta.toDouble() }.toFloat() * rotScale,
                 )
             } else {
                 Vec3f(
-                    value0.x + frames.sumOf { it.bodyPitchDelta.toDouble() }.toFloat(),
-                    value0.y + frames.sumOf { it.bodyYawDelta.toDouble() }.toFloat(),
-                    value0.z + frames.sumOf { it.bodyRollDelta.toDouble() }.toFloat(),
+                    value0.x + frames.sumOf { it.bodyPitchDelta.toDouble() }.toFloat() * rotScale,
+                    value0.y + frames.sumOf { it.bodyYawDelta.toDouble() }.toFloat() * rotScale,
+                    value0.z + frames.sumOf { it.bodyRollDelta.toDouble() }.toFloat() * rotScale,
                 )
             }
         }
@@ -244,15 +317,15 @@ class CastItemAnimation(
             val frames = hands.keys.map { frame(it, tickDelta) }
             return if (modelName == LEFT_LEG) {
                 Vec3f(
-                    value0.x + frames.sumOf { it.leftLegPitchDelta.toDouble() }.toFloat(),
-                    value0.y + frames.sumOf { it.leftLegYawDelta.toDouble() }.toFloat(),
-                    value0.z + frames.sumOf { it.leftLegRollDelta.toDouble() }.toFloat(),
+                    value0.x + frames.sumOf { it.leftLegPitchDelta.toDouble() }.toFloat() * rotScale,
+                    value0.y + frames.sumOf { it.leftLegYawDelta.toDouble() }.toFloat() * rotScale,
+                    value0.z + frames.sumOf { it.leftLegRollDelta.toDouble() }.toFloat() * rotScale,
                 )
             } else {
                 Vec3f(
-                    value0.x + frames.sumOf { it.rightLegPitchDelta.toDouble() }.toFloat(),
-                    value0.y + frames.sumOf { it.rightLegYawDelta.toDouble() }.toFloat(),
-                    value0.z + frames.sumOf { it.rightLegRollDelta.toDouble() }.toFloat(),
+                    value0.x + frames.sumOf { it.rightLegPitchDelta.toDouble() }.toFloat() * rotScale,
+                    value0.y + frames.sumOf { it.rightLegYawDelta.toDouble() }.toFloat() * rotScale,
+                    value0.z + frames.sumOf { it.rightLegRollDelta.toDouble() }.toFloat() * rotScale,
                 )
             }
         }
@@ -263,9 +336,9 @@ class CastItemAnimation(
         if (type == TransformType.POSITION) {
             return if (bone.item) {
                 Vec3f(
-                    value0.x + frame.itemXDelta,
-                    value0.y + frame.itemYDelta,
-                    value0.z + frame.itemZDelta,
+                    value0.x + frame.itemXDelta * posScale,
+                    value0.y + frame.itemYDelta * posScale,
+                    value0.z + frame.itemZDelta * posScale,
                 )
             } else {
                 value0
@@ -273,35 +346,39 @@ class CastItemAnimation(
         }
         if (type != TransformType.ROTATION) return value0
 
-        val x = if (frame.aimWeight > 0.001f) {
-            Mth.lerp(frame.aimWeight, value0.x, STAFF_BASE_PITCH + frame.aimPitch)
-        } else {
-            value0.x
-        }
-        val y = if (frame.aimWeight > 0.001f) {
-            Mth.lerp(frame.aimWeight, value0.y, frame.aimYaw)
-        } else {
-            value0.y
-        }
-        val z = if (frame.aimWeight > 0.001f) {
-            Mth.lerp(frame.aimWeight, value0.z, frame.aimRoll)
-        } else {
-            value0.z
-        }
+        val x = scaledAim(value0.x, STAFF_BASE_PITCH + frame.aimPitch, frame.aimWeight, rotScale)
+        val y = scaledAim(value0.y, frame.aimYaw, frame.aimWeight, rotScale)
+        val z = scaledAim(value0.z, frame.aimRoll, frame.aimWeight, rotScale)
 
         return if (bone.item) {
             Vec3f(
-                x + frame.itemPitchDelta,
-                y + frame.itemYawDelta,
-                z + frame.itemRollDelta,
+                x + frame.itemPitchDelta * rotScale,
+                y + frame.itemYawDelta * rotScale,
+                z + frame.itemRollDelta * rotScale,
             )
         } else {
             Vec3f(
-                x + frame.armPitchDelta + opposite.offhandPitchDelta,
-                y + frame.armYawDelta + opposite.offhandYawDelta,
-                z + frame.armRollDelta + opposite.offhandRollDelta,
+                x + (frame.armPitchDelta + opposite.offhandPitchDelta) * rotScale,
+                y + (frame.armYawDelta + opposite.offhandYawDelta) * rotScale,
+                z + (frame.armRollDelta + opposite.offhandRollDelta) * rotScale,
             )
         }
+    }
+
+    /** Local first person only. Other players keep the full pose on this client. */
+    private fun localFirstPersonScales(): Pair<Float, Float> {
+        val minecraft = Minecraft.getInstance()
+        val local = minecraft.player
+        if (local != null && local.id == player.id && minecraft.options.cameraType.isFirstPerson) {
+            return FirstPersonEnvelope.ROTATION to FirstPersonEnvelope.TRANSLATION
+        }
+        return 1f to 1f
+    }
+
+    private fun scaledAim(base: Float, target: Float, weight: Float, rotationScale: Float): Float {
+        if (weight <= 0.001f) return base
+        val blended = Mth.lerp(weight, base, target)
+        return base + (blended - base) * rotationScale
     }
 
     override fun getFirstPersonMode(tickDelta: Float): FirstPersonMode {
@@ -473,7 +550,7 @@ class CastItemAnimation(
             bodyY = -envelope * motion.bodyY,
             bodyZ = envelope * motion.bodyZ,
             headYaw = -envelope * motion.headYaw + chaos * 1.4f,
-            headPitch = -envelope * motion.headPitch - breakWave * 0.16f,
+            headPitch = -envelope * motion.headPitch - breakWave * 0.16f + mindspliceHead(state, envelope),
             headRoll = -envelope * motion.headRoll + chaos,
             leftLegYaw = envelope * motion.leftLegYaw,
             leftLegPitch = envelope * motion.leftLegPitch,
@@ -618,6 +695,15 @@ class CastItemAnimation(
         }
     }
 
+    private fun overcastNow(phase: Float): Float =
+        OvercastStrain.remaining(overcastInitial, phase - overcastStartTick)
+
+    private fun mindspliceHead(state: HandState, envelope: Float): Float {
+        if (state.pulseKind != CastPulseKind.CAST) return 0f
+        if (state.pulseProfile?.staffMaterial != StaffMaterial.MINDSPLICE) return 0f
+        return StaffDisplayTuning.headPitch() * envelope.coerceAtLeast(0f)
+    }
+
     private fun microActive(state: HandState): Boolean =
         ageTicks - state.microStartTick in 0f..MICRO_PULSE_TICKS
 
@@ -676,6 +762,8 @@ class CastItemAnimation(
         var targetY: Float = 0f,
         var shownX: Float = 0f,
         var shownY: Float = 0f,
+        var velX: Float = 0f,
+        var velY: Float = 0f,
         var weight: Float = 0f,
         var prevX: Float = 0f,
         var prevY: Float = 0f,
@@ -782,7 +870,6 @@ class CastItemAnimation(
         private const val REMOTE_AIM_TIMEOUT_TICKS = 30f
         private const val WINDUP_WEIGHT = 0.24f
         private const val HOLD_WEIGHT = 0.82f
-        private const val STAFF_AIM_PER_TICK = 0.45f
         private const val STAFF_FADE_PER_TICK = 0.22f
         private const val STAFF_YAW_SPREAD = 0.32f
         private const val STAFF_PITCH_SPREAD = 0.24f
