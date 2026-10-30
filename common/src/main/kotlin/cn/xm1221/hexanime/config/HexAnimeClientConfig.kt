@@ -49,6 +49,9 @@ object HexAnimeClientConfig {
         var cameraShake: Boolean = true
 
         @Tooltip
+        var mishapScreenEffects: Boolean = true
+
+        @Tooltip
         var firstPersonAnimations: Boolean = true
 
         @Tooltip

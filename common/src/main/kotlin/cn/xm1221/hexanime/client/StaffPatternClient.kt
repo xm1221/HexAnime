@@ -2,7 +2,6 @@ package cn.xm1221.hexanime.client
 
 import at.petrak.hexcasting.client.gui.GuiSpellcasting
 import cn.xm1221.hexanime.casting.item.CastItems
-import cn.xm1221.hexanime.casting.item.StaffMaterial
 import cn.xm1221.hexanime.config.HexAnimeClientConfig
 import cn.xm1221.hexanime.config.HexAnimeServerConfig
 import cn.xm1221.hexanime.mixin.client.GuiSpellcastingAccessor
@@ -29,7 +28,7 @@ object StaffPatternClient {
             InteractionHand.MAIN_HAND
         }
         val snapshot = CastItems.snapshot(player.getItemInHand(hand)) ?: return
-        if (snapshot.profile.staffMaterial == StaffMaterial.NONE) return
+        if (!snapshot.profile.animatesAsStaff) return
 
         val animation = CastAnimationClient.animationOf(player) ?: return
         animation.triggerMicroPulse(hand)

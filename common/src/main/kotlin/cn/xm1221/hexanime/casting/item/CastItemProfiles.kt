@@ -105,6 +105,9 @@ object CastItemProfiles {
         return profiles.firstOrNull { it.id == location }
     }
 
+    fun mishapFallbackId(staff: Boolean): ResourceLocation =
+        HexAnime.id(if (staff) "staff/wood" else "packaged/hex")
+
     private fun packagedProfile(
         path: String,
         priority: Int,

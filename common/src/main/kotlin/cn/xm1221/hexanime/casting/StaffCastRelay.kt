@@ -4,7 +4,6 @@ import at.petrak.hexcasting.api.casting.eval.vm.CastingVM
 import cn.xm1221.hexanime.casting.item.CastItems
 import cn.xm1221.hexanime.casting.item.CastPulseKind
 import cn.xm1221.hexanime.casting.item.StaffCastMotions
-import cn.xm1221.hexanime.casting.item.StaffMaterial
 import cn.xm1221.hexanime.staff.StaffAimRelay
 import dev.architectury.event.events.common.PlayerEvent
 import net.minecraft.server.level.ServerPlayer
@@ -12,9 +11,8 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Staff finishing flourish. Fired from a spell that actually plays a casting sound,
- * not from the spell GUI closing. Repeat spells inside [DEBOUNCE_TICKS] are dropped
- * so a long hex does not restart the full pose on every pattern.
+ * Staff finishing flourish. Fired from a real spell execution, including muted meta
+ * evaluations. Repeat executions inside [DEBOUNCE_TICKS] share one pose.
  */
 object StaffCastRelay {
     const val DEBOUNCE_TICKS = 10L
@@ -31,7 +29,7 @@ object StaffCastRelay {
         if (player.level().isClientSide) return
         val hand = harness.env.castingHand
         val state = CastItems.snapshot(player.getItemInHand(hand)) ?: return
-        if (state.packagedHex || state.profile.staffMaterial == StaffMaterial.NONE) return
+        if (state.packagedHex || !state.profile.animatesAsStaff) return
 
         val now = player.serverLevel().gameTime
         val last = lastCastTick[player.uuid]

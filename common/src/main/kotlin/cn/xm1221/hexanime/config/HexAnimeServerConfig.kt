@@ -2,6 +2,7 @@ package cn.xm1221.hexanime.config
 
 import cn.xm1221.hexanime.HexAnime
 import cn.xm1221.hexanime.networking.msg.MsgSyncConfigS2C
+import cn.xm1221.hexanime.staff.StaffAimTiming
 import dev.architectury.event.events.common.PlayerEvent
 import me.shedaniel.autoconfig.AutoConfig
 import me.shedaniel.autoconfig.ConfigData
@@ -75,7 +76,7 @@ object HexAnimeServerConfig {
         var maxUpdatesPerSecond: Int = 20
             private set
 
-        fun refreshTicks(): Int = refreshIntervalTicks.coerceIn(5, 100)
+        fun refreshTicks(): Int = StaffAimTiming.refreshTicks(refreshIntervalTicks)
 
         fun minIntervalNanos(): Long {
             val rate = maxUpdatesPerSecond.coerceIn(1, 40)

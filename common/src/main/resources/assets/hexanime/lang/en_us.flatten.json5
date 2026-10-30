@@ -22,9 +22,13 @@
             "": "Camera shake",
             "@Tooltip": "Adds a brief view hit on staff casts, breaks and casting mishaps.",
           },
+          mishapScreenEffects: {
+            "": "Mishap screen effects",
+            "@Tooltip": "Adds rare category-specific patterns for media, spatial and mind mishaps.",
+          },
           firstPersonAnimations: {
             "": "First-person animations",
-            "@Tooltip": "Applies the same cast motion to the vanilla first-person hand.",
+            "@Tooltip": "Applies packaged cast motion to the vanilla first-person model. Staff aim keeps its dedicated hand path.",
           },
           syncToServer: {
             "": "Send animation state",

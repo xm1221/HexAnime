@@ -18,6 +18,15 @@ class FatigueAndPoseTest {
     }
 
     @Test
+    fun damageFeedbackEndsInsteadOfPersistingWithLowMedia() {
+        assertEquals(1f, DamageFeedback.envelope(0f))
+        assertEquals(1f, DamageFeedback.envelope(2f))
+        assertTrue(DamageFeedback.envelope(8f) > 0f)
+        assertEquals(0f, DamageFeedback.envelope(DamageFeedback.DURATION_TICKS))
+        assertEquals(0f, DamageFeedback.envelope(-1f))
+    }
+
+    @Test
     fun offhandKindsMatchTheReviewedItems() {
         assertEquals(OffhandRitual.Kind.EMPTY, OffhandRitual.classify(true, "minecraft", "air"))
         assertEquals(
@@ -36,8 +45,8 @@ class FatigueAndPoseTest {
             OffhandRitual.Kind.OTHER,
             OffhandRitual.classify(false, "hexcasting", "cypher"),
         )
-        assertTrue(OffhandRitual.pose(OffhandRitual.Kind.EMPTY) != null)
-        assertTrue(OffhandRitual.pose(OffhandRitual.Kind.LORE)!!.pitch < OffhandRitual.pose(OffhandRitual.Kind.EMPTY)!!.pitch)
+        assertNull(OffhandRitual.pose(OffhandRitual.Kind.EMPTY))
+        assertTrue(OffhandRitual.pose(OffhandRitual.Kind.LORE) != null)
         assertNull(OffhandRitual.pose(OffhandRitual.Kind.OTHER))
     }
 

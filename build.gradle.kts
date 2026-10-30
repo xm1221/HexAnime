@@ -5,7 +5,7 @@ plugins {
 
 val minecraftVersion: String by project
 
-// scuffed sanity check, because we need minecraftVersion to be in gradle.properties for the hexdoc plugin
+// Keep the version exposed to Gradle tooling aligned with the version catalog.
 libs.versions.minecraft.get().also {
     if (minecraftVersion != it) {
         throw IllegalArgumentException("Mismatched Minecraft version: gradle.properties ($minecraftVersion) != libs.versions.toml ($it)")

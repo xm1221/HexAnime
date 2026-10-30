@@ -20,9 +20,9 @@ playerAnimator **没有**打进本模组，请向原作者 KosmX 下载。
 
 ## 动画结构
 
-- `CastItemProfiles`：物品到动画档案的有序注册表，按优先级匹配，可继续注册第三方物品。
+- `CastItemProfiles`：物品到动画档案的有序注册表，按优先级匹配，可继续注册第三方物品；第三方法杖可只设置 `animatesAsStaff`，不必伪造内置杖体材质。
 - 法杖瞄准固定使用原始的 yaw/pitch 比例，封装咒术不使用光标瞄准。
-- `PulsePose`：封装咒术释放、耗尽时复用的短动作。
+- `PulseStyle` / `VariantMotion`：封装咒术释放与耗尽的复用时长，以及对应的全身关键帧。
 - `DamagePose`：低媒质或低耐久时的颤抖、下垂参数。
 - `CastItemAnimation`：每个玩家一层 playerAnimator 动画，同时管理主手和副手。
 

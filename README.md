@@ -21,9 +21,9 @@ playerAnimator is **not** bundled. Download it from KosmX.
 
 ## Animation model
 
-- `CastItemProfiles`: ordered item-to-profile registry with priority-based matching and third-party registration.
+- `CastItemProfiles`: ordered item-to-profile registry with priority-based matching and third-party registration. Custom staffs can set `animatesAsStaff` without choosing a built-in body material.
 - Staff aiming uses the original fixed yaw/pitch ratios; packaged Hex items do not use cursor aim.
-- `PulsePose`: reusable release and depletion motion for packaged Hex items.
+- `PulseStyle` and `VariantMotion`: reusable release/depletion timing and full-body keyframes for packaged Hex items.
 - `DamagePose`: tremor and droop settings for low media or durability.
 - `CastItemAnimation`: one playerAnimator layer per player, managing main and offhand state.
 

@@ -7,7 +7,7 @@ import net.minecraft.world.entity.player.Player
 
 /**
  * Offhand pose while the other hand is working a staff.
- * Empty hand seals. A Patchouli book or a Hex lore fragment is lifted to be read.
+ * An empty hand stays neutral. A Patchouli book or a Hex lore fragment is lifted to be read.
  */
 object OffhandRitual {
     enum class Kind { EMPTY, PATCHOULI, LORE, OTHER }
@@ -22,7 +22,7 @@ object OffhandRitual {
     }
 
     fun pose(kind: Kind): Pose? = when (kind) {
-        Kind.EMPTY -> Pose(yaw = 0.34f, pitch = -0.58f, roll = 0.22f)
+        Kind.EMPTY -> null
         Kind.PATCHOULI, Kind.LORE -> Pose(yaw = 0.16f, pitch = -1.05f, roll = -0.08f)
         Kind.OTHER -> null
     }

@@ -1,6 +1,7 @@
 package cn.xm1221.hexanime.client
 
 import cn.xm1221.hexanime.HexAnime
+import cn.xm1221.hexanime.casting.MishapFlavor
 import cn.xm1221.hexanime.casting.item.CastItemProfiles
 import cn.xm1221.hexanime.casting.item.CastItemState
 import cn.xm1221.hexanime.casting.item.CastItems
@@ -29,6 +30,7 @@ object CastAnimationClient {
             CastAnimationTuning.LAYER_PRIORITY,
         ) { player -> CastItemLayer(player) }
         AnimationPreferencesClient.init()
+        MishapScreenEffectClient.init()
         CursorSampler.init()
         ClientTickEvent.CLIENT_POST.register { minecraft ->
             minecraft.level?.players()?.forEach { player ->
@@ -91,7 +93,16 @@ object CastAnimationClient {
             strain = msg.strain,
             kind = kind,
         )
-        if (isSelf) CameraShakeClient.trigger(kind)
+        if (isSelf) {
+            CastItemActivation.show(msg.displayStack, profile, kind, msg.strain)
+            if (kind == CastPulseKind.MISHAP) {
+                MishapScreenEffectClient.trigger(
+                    MishapFlavor.fromVariant(msg.variant),
+                    msg.forceScreenEffect,
+                )
+            }
+            CameraShakeClient.trigger(kind)
+        }
     }
 
 

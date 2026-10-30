@@ -8,16 +8,11 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Staff flourish follows a spell that plays the casting sound. Patterns that only
- * touch the stack do not, and closing the spell GUI does not either.
- */
+/** Staff flourish follows every real spell execution, including muted meta evaluations. */
 @Mixin(value = OperatorSideEffect.AttemptSpell.class, remap = false)
 public abstract class AttemptSpellMixin {
     @Inject(method = "performEffect", at = @At("TAIL"), remap = false)
     private void hexanime$staffCast(CastingVM harness, CallbackInfo ci) {
-        OperatorSideEffect.AttemptSpell spell = (OperatorSideEffect.AttemptSpell) (Object) this;
-        if (!spell.getHasCastingSound()) return;
         StaffCastRelay.onAttemptSpell(harness);
     }
 }

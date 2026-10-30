@@ -12,6 +12,23 @@ enum class StaffMaterial {
     TAGGED,
 }
 
+/** Packaged-item choreography selected from its visual shape and texture. */
+enum class ItemCastMotion {
+    ARM_FLIGHT,
+    CHEST_HOVER,
+    CHEST_SPIN,
+    HAND_THRUST;
+
+    companion object {
+        fun forVariant(variant: Int): ItemCastMotion = when (Math.floorMod(variant, 8)) {
+            0, 2 -> ARM_FLIGHT
+            1, 4, 6 -> CHEST_SPIN
+            5 -> HAND_THRUST
+            else -> CHEST_HOVER
+        }
+    }
+}
+
 /**
  * A complete full-body cast motion. Packaged Hex items select one of these by [variant], never by
  * item class, so all artifacts/cyphers/trinkets with the same visual variant move coherently.
@@ -136,6 +153,12 @@ class CastItemProfile(
     val supportsPulse: Boolean,
     val damage: DamagePose,
     val staffMaterial: StaffMaterial = StaffMaterial.NONE,
+    /**
+     * Staff-specific effects do not require a built-in body material. Third-party profiles for
+     * custom staffs should set this when [staffMaterial] is [StaffMaterial.NONE].
+     */
+    val animatesAsStaff: Boolean = staffMaterial != StaffMaterial.NONE,
+    val itemCastMotion: ItemCastMotion? = null,
     val pulseStyle: PulseStyle = PulseStyle.DEFAULT,
     private val matcher: (ItemStack) -> Boolean,
 ) {

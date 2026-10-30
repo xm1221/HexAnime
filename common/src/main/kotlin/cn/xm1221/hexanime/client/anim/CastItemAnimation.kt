@@ -1,17 +1,20 @@
 package cn.xm1221.hexanime.client.anim
 
 import cn.xm1221.hexanime.casting.OvercastStrain
+import cn.xm1221.hexanime.casting.MishapFlavor
 import cn.xm1221.hexanime.casting.item.CastItemProfile
 import cn.xm1221.hexanime.casting.item.CastItemState
 import cn.xm1221.hexanime.casting.item.CastItems
 import cn.xm1221.hexanime.casting.item.CastPulseKind
 import cn.xm1221.hexanime.casting.item.DamagePose
+import cn.xm1221.hexanime.casting.item.ItemCastMotion
 import cn.xm1221.hexanime.casting.item.PulseStyle
 import cn.xm1221.hexanime.casting.item.StaffCastMotions
 import cn.xm1221.hexanime.casting.item.StaffMaterial
 import cn.xm1221.hexanime.casting.item.VariantMotion
 import cn.xm1221.hexanime.casting.item.VariantMotions
 import cn.xm1221.hexanime.config.HexAnimeClientConfig
+import cn.xm1221.hexanime.staff.StaffAimTiming
 import cn.xm1221.hexanime.staff.Staffs
 import dev.kosmx.playerAnim.api.TransformType
 import dev.kosmx.playerAnim.api.firstPerson.FirstPersonMode
@@ -83,7 +86,7 @@ class CastItemAnimation(
         if (isPulseActive(state) && kind.priority < state.pulseKind.priority) return
         if (kind == CastPulseKind.BREAK && !profile.pulseStyle.allowBreak) return
         if (kind == CastPulseKind.CAST &&
-            profile.staffMaterial != StaffMaterial.NONE &&
+            profile.animatesAsStaff &&
             isPulseActive(state) &&
             state.pulseKind == CastPulseKind.CAST
         ) {
@@ -107,7 +110,7 @@ class CastItemAnimation(
      * Uses the raw aim target, not the displayed spring.
      */
     fun triggerLocalStaffCast(hand: InteractionHand, profile: CastItemProfile, strain: Float) {
-        if (profile.staffMaterial == StaffMaterial.NONE || !profile.supportsPulse) return
+        if (!profile.animatesAsStaff || !profile.supportsPulse) return
         val state = hands.getValue(hand)
         val variant = StaffCastMotions.variantForCursor(state.targetX, state.targetY)
         triggerPulse(hand, profile, variant, strain, CastPulseKind.CAST)
@@ -115,13 +118,16 @@ class CastItemAnimation(
 
     override fun isActive(): Boolean {
         if (!HexAnimeClientConfig.config.enabled) return false
+        val overcast = overcastNow(ageTicks)
         return hands.values.any { state ->
-            state.activeAim ||
-                state.weight > 0.01f ||
-                isPulseActive(state) ||
-                microActive(state) ||
-                fatigueActive(state) ||
-                hasDamageMotion(state)
+            CastItemActivity.shouldRun(
+                enabled = true,
+                hasAim = state.activeAim || state.weight > 0.01f,
+                hasPulse = isPulseActive(state),
+                hasMicroPulse = microActive(state),
+                hasFatigue = fatigueActive(state),
+                overcastStrain = if (state.profile?.animatesAsStaff == true) overcast else 0f,
+            )
         }
     }
 
@@ -130,7 +136,7 @@ class CastItemAnimation(
         observeHeldItems()
         for (state in hands.values) {
             if (state.remoteAim && state.activeAim &&
-                ageTicks - state.lastRemoteAimTick > REMOTE_AIM_TIMEOUT_TICKS
+                ageTicks - state.lastRemoteAimTick > StaffAimTiming.REMOTE_TIMEOUT_TICKS
             ) {
                 state.activeAim = false
             }
@@ -150,11 +156,12 @@ class CastItemAnimation(
 
     /** Display follow only. [HandState.targetX] stays the raw sample used for flourishes and the network. */
     private fun stepAimSpring(state: HandState) {
+        val profile = state.profile
         val material = state.profile?.staffMaterial ?: StaffMaterial.NONE
         val moving = state.activeAim ||
             abs(state.shownX) > 0.001f || abs(state.shownY) > 0.001f ||
             abs(state.velX) > 0.001f || abs(state.velY) > 0.001f
-        if (material == StaffMaterial.NONE || !moving) {
+        if (profile?.animatesAsStaff != true || !moving) {
             if (!state.activeAim) {
                 state.shownX = 0f
                 state.shownY = 0f
@@ -203,6 +210,15 @@ class CastItemAnimation(
 
         val state = hands.getValue(hand)
         val profile = state.profile ?: return CastHandFrame.EMPTY
+        val active = CastItemActivity.shouldRun(
+            enabled = true,
+            hasAim = state.activeAim || state.weight > 0.01f,
+            hasPulse = isPulseActive(state),
+            hasMicroPulse = microActive(state),
+            hasFatigue = fatigueActive(state),
+            overcastStrain = if (profile.animatesAsStaff) overcastNow(ageTicks) else 0f,
+        )
+        if (!active) return CastHandFrame.EMPTY
         var x = Mth.lerp(tickDelta, state.prevX, state.shownX)
         var y = Mth.lerp(tickDelta, state.prevY, state.shownY)
         if (profile.staffMaterial == StaffMaterial.QUENCHED) {
@@ -214,22 +230,28 @@ class CastItemAnimation(
         val aimYaw = if (profile.supportsAim) -x * STAFF_YAW_SPREAD else 0f
         val aimPitch = if (profile.supportsAim) y * STAFF_PITCH_SPREAD else 0f
         val phase = ageTicks + tickDelta
-        val strain = if (profile.staffMaterial == StaffMaterial.NONE) {
+        val strain = if (!profile.animatesAsStaff) {
             state.strain
         } else {
             maxOf(state.strain, overcastNow(phase))
         }
-        val damage = if (config.damageAnimations) damageState(profile.damage, strain) else 0f
+        val damage = if (config.damageAnimations) {
+            damageState(profile.damage, strain) * damageFeedbackNow(state, phase)
+        } else {
+            0f
+        }
         val tremor = damageTremor(profile.damage, damage, phase, state.variant)
-        val chaos = if (profile.staffMaterial == StaffMaterial.NONE) {
+        val chaos = if (!profile.animatesAsStaff) {
             Tremor.NONE
         } else {
             StaffDisplay.chaos(strain, phase).let { Tremor(it.yaw, it.pitch, it.roll) }
         }
-        val pulse = pulseMotion(state, phase)
+        val pulse = pulseMotion(hand, state, phase)
         val micro = microPitch(state, phase)
         val fatigue = FatigueCurve.envelope(phase - state.fatigueStartTick)
-        val ritual = if (profile.staffMaterial != StaffMaterial.NONE &&
+        val offhandEmpty = player.getItemInHand(hand.opposite()).isEmpty
+        val ritual = if (!offhandEmpty &&
+            profile.animatesAsStaff &&
             (weight > 0.05f || isPulseActive(state))
         ) {
             OffhandRitual.poseFor(player, hand)
@@ -288,9 +310,9 @@ class CastItemAnimation(
             itemXDelta = itemX,
             itemYDelta = itemY,
             itemZDelta = itemZ,
-            offhandYawDelta = pulse.offhandYaw + (ritual?.yaw ?: 0f) * ritualWeight,
-            offhandPitchDelta = pulse.offhandPitch + (ritual?.pitch ?: 0f) * ritualWeight,
-            offhandRollDelta = pulse.offhandRoll + (ritual?.roll ?: 0f) * ritualWeight,
+            offhandYawDelta = if (offhandEmpty) 0f else pulse.offhandYaw + (ritual?.yaw ?: 0f) * ritualWeight,
+            offhandPitchDelta = if (offhandEmpty) 0f else pulse.offhandPitch + (ritual?.pitch ?: 0f) * ritualWeight,
+            offhandRollDelta = if (offhandEmpty) 0f else pulse.offhandRoll + (ritual?.roll ?: 0f) * ritualWeight,
             firstPersonYaw = pulse.firstPersonYaw,
             firstPersonPitch = pulse.firstPersonPitch + micro + fatigue * FatigueCurve.ITEM_DROOP,
             firstPersonRoll = pulse.firstPersonRoll,
@@ -347,6 +369,7 @@ class CastItemAnimation(
         tickDelta: Float,
         value0: Vec3f,
     ): Vec3f {
+        val firstPerson = isLocalFirstPerson()
         val (rotScale, posScale) = localFirstPersonScales()
         if (modelName == BODY || modelName == HEAD) {
             val frames = hands.keys.map { frame(it, tickDelta) }
@@ -395,10 +418,19 @@ class CastItemAnimation(
         val opposite = frame(bone.hand.opposite(), tickDelta)
         if (type == TransformType.POSITION) {
             return if (bone.item) {
+                var itemZ = frame.itemZDelta
+                if (!firstPerson && frame.profile?.animatesAsStaff == false) {
+                    val motion = frame.profile.itemCastMotion
+                        ?: frame.motion?.variant?.let(ItemCastMotion::forVariant)
+                    if (motion == ItemCastMotion.CHEST_HOVER || motion == ItemCastMotion.CHEST_SPIN) {
+                        itemZ = -itemZ
+                    }
+                }
+                val itemScale = if (firstPerson) FIRST_PERSON_ITEM_POSITION_SCALE else posScale
                 Vec3f(
-                    value0.x + frame.itemXDelta * posScale,
-                    value0.y + frame.itemYDelta * posScale,
-                    value0.z + frame.itemZDelta * posScale,
+                    value0.x + frame.itemXDelta * itemScale,
+                    value0.y + frame.itemYDelta * itemScale,
+                    value0.z + itemZ * itemScale,
                 )
             } else {
                 value0
@@ -411,10 +443,11 @@ class CastItemAnimation(
         val z = scaledAim(value0.z, frame.aimRoll, frame.aimWeight, rotScale)
 
         return if (bone.item) {
+            val itemScale = if (firstPerson) FIRST_PERSON_ITEM_ROTATION_SCALE else rotScale
             Vec3f(
-                x + frame.itemPitchDelta * rotScale,
-                y + frame.itemYawDelta * rotScale,
-                z + frame.itemRollDelta * rotScale,
+                x + frame.itemPitchDelta * itemScale,
+                y + frame.itemYawDelta * itemScale,
+                z + frame.itemRollDelta * itemScale,
             )
         } else {
             Vec3f(
@@ -427,12 +460,18 @@ class CastItemAnimation(
 
     /** Local first person only. Other players keep the full pose on this client. */
     private fun localFirstPersonScales(): Pair<Float, Float> {
-        val minecraft = Minecraft.getInstance()
-        val local = minecraft.player
-        if (local != null && local.id == player.id && minecraft.options.cameraType.isFirstPerson) {
+        if (isLocalFirstPerson()) {
             return FirstPersonEnvelope.ROTATION to FirstPersonEnvelope.TRANSLATION
         }
         return 1f to 1f
+    }
+
+    private fun isLocalFirstPerson(): Boolean {
+        val minecraft = Minecraft.getInstance()
+        val local = minecraft.player
+        return local != null &&
+            local.id == player.id &&
+            minecraft.options.cameraType.isFirstPerson
     }
 
     private fun scaledAim(base: Float, target: Float, weight: Float, rotationScale: Float): Float {
@@ -454,7 +493,10 @@ class CastItemAnimation(
             }
         }
         val staffAimVisible = hands.values.any { state ->
-            state.profile?.supportsAim == true && (state.activeAim || state.weight > 0.01f)
+            val profile = state.profile
+            profile?.animatesAsStaff == true &&
+                profile.supportsAim &&
+                (state.activeAim || state.weight > 0.01f)
         }
         return when {
             staffAimVisible -> FirstPersonMode.NONE
@@ -490,6 +532,7 @@ class CastItemAnimation(
 
             if (HexAnimeClientConfig.config.damageAnimations &&
                 (damageJump || mediaDrop) &&
+                isCastingContext(state) &&
                 !isPulseActive(state)
             ) {
                 triggerPulseInternal(state, snapshot.profile, snapshot.variant, snapshot.strain, CastPulseKind.DAMAGE)
@@ -501,6 +544,7 @@ class CastItemAnimation(
                 previousProfile?.pulseStyle?.allowBreak != false &&
                 state.strain >= 0.92f &&
                 previousProfile != null &&
+                isCastingContext(state) &&
                 !isPulseActive(state)
             ) {
                 triggerPulseInternal(
@@ -514,6 +558,7 @@ class CastItemAnimation(
             state.hasSample = false
             state.lastDamageValue = -1
             state.lastMediaFullness = -1f
+            state.damageFeedbackStartTick = -10_000f
             if (!state.activeAim && !isPulseActive(state) && state.weight <= 0.01f) {
                 state.strain = 0f
             }
@@ -527,6 +572,7 @@ class CastItemAnimation(
         strain: Float,
         kind: CastPulseKind,
     ) {
+        if (kind == CastPulseKind.DAMAGE) state.damageFeedbackStartTick = ageTicks
         val style = profile.pulseStyle
         if (style.reentry &&
             kind == CastPulseKind.CAST &&
@@ -541,6 +587,12 @@ class CastItemAnimation(
             state.pulseKind = kind
             state.pulseStartTick = style.reentryStartTick(ageTicks, duration)
             return
+        }
+        if (kind == CastPulseKind.CAST) {
+            state.castOrdinal += 1
+            state.legMotionAllowed = LegMotionCadence.shouldAnimate(state.castOrdinal)
+        } else {
+            state.legMotionAllowed = kind == CastPulseKind.BREAK || kind == CastPulseKind.MISHAP
         }
         state.pulseProfile = profile
         state.pulseVariant = variant.coerceAtLeast(0)
@@ -564,13 +616,7 @@ class CastItemAnimation(
         return ageTicks - state.pulseStartTick in 0f..duration
     }
 
-    private fun hasDamageMotion(state: HandState): Boolean {
-        if (!HexAnimeClientConfig.config.damageAnimations) return false
-        val profile = state.profile ?: return false
-        return damageState(profile.damage, state.strain) > 0f
-    }
-
-    private fun pulseMotion(state: HandState, phase: Float): PulseMotion {
+    private fun pulseMotion(hand: InteractionHand, state: HandState, phase: Float): PulseMotion {
         if (!isPulseActive(state)) return PulseMotion.NONE
         val motion = motionFor(state)
         val elapsed = phase - state.pulseStartTick
@@ -601,6 +647,7 @@ class CastItemAnimation(
             envelope * motion.bodyPitch - breakWave * 0.12f
         }
 
+        val legScale = if (state.legMotionAllowed) 1f else 0f
         return PulseMotion(
             motion = motion,
             bodyYaw = envelope * motion.bodyYaw + chaos,
@@ -612,12 +659,12 @@ class CastItemAnimation(
             headYaw = -envelope * motion.headYaw + chaos * 1.4f,
             headPitch = -envelope * motion.headPitch - breakWave * 0.16f + mindspliceHead(state, envelope),
             headRoll = -envelope * motion.headRoll + chaos,
-            leftLegYaw = envelope * motion.leftLegYaw,
-            leftLegPitch = envelope * motion.leftLegPitch,
-            leftLegRoll = envelope * motion.leftLegRoll * rollScale,
-            rightLegYaw = envelope * motion.rightLegYaw,
-            rightLegPitch = envelope * motion.rightLegPitch,
-            rightLegRoll = envelope * motion.rightLegRoll * rollScale,
+            leftLegYaw = envelope * motion.leftLegYaw * legScale,
+            leftLegPitch = envelope * motion.leftLegPitch * legScale,
+            leftLegRoll = envelope * motion.leftLegRoll * rollScale * legScale,
+            rightLegYaw = envelope * motion.rightLegYaw * legScale,
+            rightLegPitch = envelope * motion.rightLegPitch * legScale,
+            rightLegRoll = envelope * motion.rightLegRoll * rollScale * legScale,
             armYaw = envelope * motion.armYaw,
             armPitch = envelope * motion.armPitch - breakWave * 0.10f,
             armRoll = envelope * motion.armRoll + chaos,
@@ -637,6 +684,33 @@ class CastItemAnimation(
             firstPersonY = envelope * motion.firstPersonY,
             firstPersonZ = envelope * motion.firstPersonZ,
             breakWave = breakWave,
+        ).withFloatingItem(hand, state, t)
+    }
+
+    private fun PulseMotion.withFloatingItem(
+        hand: InteractionHand,
+        state: HandState,
+        t: Float,
+    ): PulseMotion {
+        if (state.pulseKind != CastPulseKind.CAST) return this
+        val profile = state.pulseProfile ?: return this
+        if (profile.animatesAsStaff) return this
+        val motion = profile.itemCastMotion
+            ?: ItemCastMotion.forVariant(state.pulseVariant)
+        val inward = if (Staffs.armBone(player, hand) == Staffs.RIGHT_ARM) -1f else 1f
+        val floating = ItemFloatMotions.pose(motion, t, inward) ?: return this
+        val weight = floating.weight
+        val (itemX, itemY, itemZ) = floating.firstPersonOffset()
+        return copy(
+            armYaw = lerp(armYaw, floating.armYaw, weight),
+            armPitch = lerp(armPitch, floating.armPitch, weight),
+            armRoll = lerp(armRoll, floating.armRoll, weight),
+            itemYaw = lerp(itemYaw, floating.itemYaw, weight),
+            itemPitch = lerp(itemPitch, floating.itemPitch, weight),
+            itemRoll = lerp(itemRoll, floating.itemRoll, weight),
+            itemX = lerp(this.itemX, itemX, weight),
+            itemY = lerp(this.itemY, itemY, weight),
+            itemZ = lerp(this.itemZ, itemZ, weight),
         )
     }
 
@@ -651,40 +725,83 @@ class CastItemAnimation(
         val impact = abs(envelope)
         val mirror = if (state.pulseVariant % 2 == 0) 1f else -1f
         val stagger = sin(t * PI * 3f).toFloat() * (1f - t)
+        val flavor = MishapFlavor.fromVariant(state.pulseVariant)
+        val collapse = when (flavor) {
+            MishapFlavor.RECOIL -> 0.48f
+            MishapFlavor.MEDIA -> 0.68f
+            MishapFlavor.SPATIAL -> 0.30f
+            MishapFlavor.MIND -> 0.38f
+        }
+        val side = when (flavor) {
+            MishapFlavor.RECOIL -> 0.10f
+            MishapFlavor.MEDIA -> 0.05f
+            MishapFlavor.SPATIAL -> 0.28f
+            MishapFlavor.MIND -> 0.16f
+        }
+        val headYaw = when (flavor) {
+            MishapFlavor.RECOIL -> 0.20f
+            MishapFlavor.MEDIA -> 0.10f
+            MishapFlavor.SPATIAL -> 0.34f
+            MishapFlavor.MIND -> 0.62f
+        }
+        val headRoll = when (flavor) {
+            MishapFlavor.RECOIL -> 0.06f
+            MishapFlavor.MEDIA -> 0.05f
+            MishapFlavor.SPATIAL -> 0.12f
+            MishapFlavor.MIND -> 0.34f
+        }
+        val mindWave = if (flavor == MishapFlavor.MIND) {
+            sin(t * PI * 9f).toFloat() * (1f - t)
+        } else {
+            0f
+        }
+        val spatialWave = if (flavor == MishapFlavor.SPATIAL) {
+            sin(t * PI * 4f).toFloat() * (1f - t)
+        } else {
+            0f
+        }
+        val mediaSag = if (flavor == MishapFlavor.MEDIA) impact else 0f
+        val armClutch = if (flavor == MishapFlavor.MIND) 0.26f * impact else 0f
         return PulseMotion(
             motion = motion,
-            bodyYaw = mirror * 0.08f * impact + chaos * 0.35f,
-            bodyPitch = impact * 0.48f + abs(breakWave) * 0.08f,
-            bodyRoll = mirror * 0.035f * impact + chaos * 0.22f,
-            bodyX = -mirror * 0.10f * impact,
-            bodyY = 0.04f * impact,
+            bodyYaw = mirror * side * 0.80f * impact + chaos * 0.35f + mindWave * 0.08f,
+            bodyPitch = impact * collapse + abs(breakWave) * 0.08f + mediaSag * 0.08f,
+            bodyRoll = mirror * side * 0.35f * impact + chaos * 0.22f + mindWave * 0.06f,
+            bodyX = (-mirror * side + spatialWave * 0.10f) * impact,
+            bodyY = (0.04f - mediaSag * 0.12f) * impact,
             bodyZ = 0.24f * impact + abs(breakWave) * 0.06f,
-            headYaw = -mirror * 0.20f * impact + chaos * 1.1f,
-            headPitch = 0.20f * impact - breakWave * 0.10f,
-            headRoll = -mirror * 0.06f * impact + chaos,
+            headYaw = -mirror * headYaw * impact + chaos * 1.1f + mindWave * 0.42f,
+            headPitch = (if (flavor == MishapFlavor.MEDIA) 0.38f else 0.20f) * impact -
+                breakWave * 0.10f,
+            headRoll = -mirror * headRoll * impact + chaos + mindWave * 0.30f,
             leftLegYaw = mirror * 0.18f * impact,
-            leftLegPitch = 0.26f * impact + stagger * 0.12f,
+            leftLegPitch = (if (flavor == MishapFlavor.MEDIA) 0.40f else 0.26f) * impact +
+                stagger * 0.12f,
             leftLegRoll = -mirror * 0.04f * impact,
             rightLegYaw = -mirror * 0.14f * impact,
-            rightLegPitch = -0.20f * impact - stagger * 0.08f,
+            rightLegPitch = if (flavor == MishapFlavor.MEDIA) {
+                -0.34f * impact - stagger * 0.08f
+            } else {
+                -0.20f * impact - stagger * 0.08f
+            },
             rightLegRoll = mirror * 0.03f * impact,
-            armYaw = mirror * 0.38f * impact,
-            armPitch = -0.52f * impact - abs(breakWave) * 0.08f,
-            armRoll = mirror * 0.46f * impact + chaos,
-            itemYaw = -mirror * 0.32f * impact,
-            itemPitch = 0.44f * impact - breakWave * 0.12f,
-            itemRoll = mirror * 0.56f * impact + chaos * 1.2f,
-            itemX = -mirror * 0.08f * impact,
+            armYaw = mirror * (0.38f + side) * impact + mindWave * 0.16f,
+            armPitch = (-0.52f - armClutch) * impact - abs(breakWave) * 0.08f,
+            armRoll = mirror * (0.46f + armClutch) * impact + chaos,
+            itemYaw = -mirror * (0.32f + headYaw * 0.28f) * impact,
+            itemPitch = (0.44f + mediaSag * 0.12f) * impact - breakWave * 0.12f,
+            itemRoll = mirror * (0.56f + headRoll) * impact + chaos * 1.2f + mindWave * 0.22f,
+            itemX = (-mirror * side * 0.80f + spatialWave * 0.06f) * impact,
             itemY = -0.08f * impact,
             itemZ = 0.18f * impact,
             offhandYaw = -mirror * 0.44f * impact,
             offhandPitch = -0.62f * impact,
             offhandRoll = -mirror * 0.38f * impact - chaos,
-            firstPersonYaw = 0f,
-            firstPersonPitch = 0f,
-            firstPersonRoll = 0f,
-            firstPersonX = 0f,
-            firstPersonY = 0f,
+            firstPersonYaw = spatialWave * 0.18f + mindWave * 0.08f,
+            firstPersonPitch = (if (flavor == MishapFlavor.MEDIA) 0.20f else -0.12f) * impact,
+            firstPersonRoll = mindWave * 0.16f,
+            firstPersonX = spatialWave * 0.04f,
+            firstPersonY = -mediaSag * 0.06f,
             firstPersonZ = 0f,
             breakWave = breakWave,
         )
@@ -748,7 +865,7 @@ class CastItemAnimation(
 
     private fun motionFor(state: HandState): VariantMotion {
         val profile = state.pulseProfile
-        return if (profile != null && profile.staffMaterial != StaffMaterial.NONE) {
+        return if (profile?.animatesAsStaff == true) {
             StaffCastMotions.byVariant(state.pulseVariant)
         } else {
             VariantMotions.byVariant(state.pulseVariant)
@@ -781,8 +898,18 @@ class CastItemAnimation(
         return when (state.pulseKind) {
             CastPulseKind.MISHAP -> (base + 12f).coerceAtLeast(28f)
             CastPulseKind.BREAK -> base + 4f
-            CastPulseKind.DAMAGE -> (base * 0.65f).coerceAtLeast(10f)
-            CastPulseKind.CAST -> base
+            CastPulseKind.DAMAGE -> (base * 0.45f).coerceIn(8f, 12f)
+            CastPulseKind.CAST -> if (state.pulseProfile?.animatesAsStaff == false) {
+                if ((state.pulseProfile?.itemCastMotion
+                        ?: ItemCastMotion.forVariant(state.pulseVariant)) == ItemCastMotion.HAND_THRUST
+                ) {
+                    base * PACKAGED_THRUST_DURATION_SCALE
+                } else {
+                    base + PACKAGED_CAST_EXTRA_TICKS
+                }
+            } else {
+                base
+            }
         }
     }
 
@@ -790,6 +917,12 @@ class CastItemAnimation(
         if (strain <= pose.threshold) return 0f
         return ((strain - pose.threshold) / (1f - pose.threshold)).coerceIn(0f, 1f)
     }
+
+    private fun damageFeedbackNow(state: HandState, phase: Float): Float =
+        DamageFeedback.envelope(phase - state.damageFeedbackStartTick)
+
+    private fun isCastingContext(state: HandState): Boolean =
+        state.activeAim || state.weight > 0.01f || isPulseActive(state) || player.isUsingItem
 
     private fun damageTremor(
         pose: DamagePose,
@@ -835,6 +968,9 @@ class CastItemAnimation(
         var pulseVariant: Int = 0,
         var pulseKind: CastPulseKind = CastPulseKind.CAST,
         var pulseStartTick: Float = -10_000f,
+        var castOrdinal: Int = 0,
+        var legMotionAllowed: Boolean = false,
+        var damageFeedbackStartTick: Float = -10_000f,
         var microStartTick: Float = -10_000f,
         var mishapWasActive: Boolean = false,
         var fatigueStartTick: Float = -10_000f,
@@ -932,7 +1068,6 @@ class CastItemAnimation(
         private const val HEAD = "head"
         private const val LEFT_LEG = "leftLeg"
         private const val RIGHT_LEG = "rightLeg"
-        private const val REMOTE_AIM_TIMEOUT_TICKS = 30f
         private const val WINDUP_WEIGHT = 0.24f
         private const val HOLD_WEIGHT = 0.82f
         private const val STAFF_FADE_PER_TICK = 0.22f
@@ -940,6 +1075,10 @@ class CastItemAnimation(
         private const val STAFF_PITCH_SPREAD = 0.24f
         private const val MICRO_PULSE_TICKS = 4f
         private const val MICRO_PULSE_PITCH = -0.10f
+        private const val PACKAGED_CAST_EXTRA_TICKS = 8f
+        private const val PACKAGED_THRUST_DURATION_SCALE = 0.72f
+        private const val FIRST_PERSON_ITEM_POSITION_SCALE = 0.75f
+        private const val FIRST_PERSON_ITEM_ROTATION_SCALE = 0.85f
     }
 }
 

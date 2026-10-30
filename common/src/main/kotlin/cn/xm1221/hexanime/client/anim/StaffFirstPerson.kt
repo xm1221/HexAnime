@@ -1,7 +1,6 @@
 package cn.xm1221.hexanime.client.anim
 
 import cn.xm1221.hexanime.client.CastAnimationClient
-import cn.xm1221.hexanime.staff.Staffs
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.math.Axis
 import net.minecraft.client.player.AbstractClientPlayer
@@ -16,7 +15,8 @@ object StaffFirstPerson {
     private const val PITCH_SPREAD = 0.16f
     private const val MODEL_YAW_SPREAD = 0.32f
     private const val MODEL_PITCH_SPREAD = 0.24f
-    private const val BASE_VERTICAL_PITCH = -0.48f
+    private const val BASE_VERTICAL_PITCH = -0.32f
+    private const val BASE_VERTICAL_LIFT = 0.12f
 
     @JvmStatic
     fun pushAim(
@@ -26,9 +26,14 @@ object StaffFirstPerson {
         partialTick: Float,
     ): Boolean {
         if (CastAnimationClient.isMishapActive(player, hand)) return false
-        if (!Staffs.holdsStaff(player, hand)) return false
         val frame = CastAnimationClient.frame(player, hand, partialTick)
-        if (frame.profile?.supportsAim != true || frame.aimWeight <= 0.001f) return false
+        val profile = frame.profile
+        if (profile?.animatesAsStaff != true ||
+            !profile.supportsAim ||
+            frame.aimWeight <= 0.001f
+        ) {
+            return false
+        }
 
         val rot = FirstPersonEnvelope.ROTATION
         val pos = FirstPersonEnvelope.TRANSLATION
@@ -38,7 +43,7 @@ object StaffFirstPerson {
         poseStack.pushPose()
         poseStack.translate(
             frame.firstPersonX * pos,
-            frame.firstPersonY * pos,
+            frame.firstPersonY * pos + BASE_VERTICAL_LIFT * frame.aimWeight,
             frame.firstPersonZ * pos,
         )
         poseStack.mulPose(Axis.YP.rotation(yaw + frame.firstPersonYaw * rot))

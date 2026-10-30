@@ -1,7 +1,6 @@
 package cn.xm1221.hexanime.client
 
 import at.petrak.hexcasting.api.HexAPI
-import cn.xm1221.hexanime.casting.item.StaffMaterial
 import cn.xm1221.hexanime.client.anim.StaffDisplay
 import cn.xm1221.hexanime.config.HexAnimeClientConfig
 import cn.xm1221.hexanime.staff.Staffs
@@ -19,10 +18,15 @@ object StaffTipParticles {
         if (!HexAnimeClientConfig.config.enabled || !HexAnimeClientConfig.config.staffTipParticles) return
         val level = minecraft.level ?: return
         for (player in level.players()) {
+            val animation = CastAnimationClient.animationOf(player)
+            if (animation?.isActive() != true) continue
             for (hand in InteractionHand.values()) {
                 val frame = CastAnimationClient.frame(player, hand, 1f)
-                val material = frame.profile?.staffMaterial ?: StaffMaterial.NONE
-                if (material == StaffMaterial.NONE || frame.strain <= StaffDisplay.PARTICLE_STRAIN) continue
+                if (frame.profile?.animatesAsStaff != true ||
+                    frame.strain <= StaffDisplay.PARTICLE_STRAIN
+                ) {
+                    continue
+                }
                 spawn(player, hand)
             }
         }
