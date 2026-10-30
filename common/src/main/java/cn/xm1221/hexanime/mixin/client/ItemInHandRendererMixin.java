@@ -18,11 +18,16 @@ public class ItemInHandRendererMixin {
     @Unique
     private boolean hexanime$aimed;
 
+    /**
+     * Pin the outer {@code pushPose} in {@code renderArmWithItem}. Vanilla 1.20.1 has one push/pop
+     * pair here; an unpinned injector would also match a later push and leave the stack unbalanced.
+     */
     @Inject(
         method = "renderArmWithItem",
         at = @At(
             value = "INVOKE",
             target = "Lcom/mojang/blaze3d/vertex/PoseStack;pushPose()V",
+            ordinal = 0,
             remap = false
         )
     )
@@ -47,6 +52,7 @@ public class ItemInHandRendererMixin {
         at = @At(
             value = "INVOKE",
             target = "Lcom/mojang/blaze3d/vertex/PoseStack;popPose()V",
+            ordinal = 0,
             shift = At.Shift.AFTER,
             remap = false
         )
