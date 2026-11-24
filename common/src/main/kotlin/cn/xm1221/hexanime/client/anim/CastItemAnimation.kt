@@ -37,6 +37,8 @@ class CastItemAnimation(
     private var ageTicks = 0f
     private var overcastInitial = 0f
     private var overcastStartTick = -10_000f
+    private var elytraWeight = 0f
+    private var prevElytraWeight = 0f
 
     fun setAim(
         active: Boolean,
@@ -64,7 +66,15 @@ class CastItemAnimation(
             state.variant = variant.coerceAtLeast(0)
             state.strain = strain.coerceIn(0f, 1f)
         }
+        val wasAiming = state.activeAim
         state.activeAim = active && profile?.supportsAim == true
+        state.remoteAim = remote
+        if (state.activeAim && !wasAiming) {
+            state.patternCount = 0
+            if (remote) state.remoteAimStartTick = ageTicks
+        } else if (!state.activeAim && wasAiming) {
+            state.patternCount = 0
+        }
         state.remoteAim = remote
         if (state.activeAim && remote) state.lastRemoteAimTick = ageTicks
         if (state.activeAim) {
@@ -101,6 +111,44 @@ class CastItemAnimation(
         overcastStartTick = ageTicks
     }
 
+    fun recordPatternSuccess(hand: InteractionHand) {
+        hands.getValue(hand).patternCount += 1
+    }
+
+    fun currentResonance(hand: InteractionHand, tickDelta: Float): Float {
+        if (!HexAnimeClientConfig.config.comboResonance) return 0f
+        val state = hands.getValue(hand)
+        return Mth.lerp(tickDelta, state.prevResonance, state.resonance)
+    }
+
+    fun isAiming(): Boolean = hands.values.any { it.activeAim }
+
+    fun maxPatternCount(): Int = hands.values.maxOf { it.patternCount }
+
+    fun maxResonance(tickDelta: Float): Float {
+        if (!HexAnimeClientConfig.config.comboResonance) return 0f
+        return hands.keys.maxOf { currentResonance(it, tickDelta) }
+    }
+
+    fun elytraPose(tickDelta: Float): ElytraFirstPersonPose.Result {
+        if (!HexAnimeClientConfig.config.elytraFirstPerson) return ElytraFirstPersonPose.Result.ZERO
+        val w = Mth.lerp(tickDelta, prevElytraWeight, elytraWeight)
+        return ElytraFirstPersonPose.compute(
+            weight = w,
+            cameraPitchDeg = player.getViewXRot(tickDelta),
+            speed = player.deltaMovement.length().toFloat(),
+            firstPerson = isLocalFirstPerson(),
+        )
+    }
+
+    fun setStrokeDrawing(hand: InteractionHand, drawing: Boolean) {
+        val state = hands.getValue(hand)
+        if (drawing && !state.strokeDrawing) {
+            state.strokePressStartTick = ageTicks
+        }
+        state.strokeDrawing = drawing
+    }
+
     fun triggerMicroPulse(hand: InteractionHand) {
         hands.getValue(hand).microStartTick = ageTicks
     }
@@ -127,12 +175,18 @@ class CastItemAnimation(
                 hasMicroPulse = microActive(state),
                 hasFatigue = fatigueActive(state),
                 overcastStrain = if (state.profile?.animatesAsStaff == true) overcast else 0f,
+                hasEquipDraw = equipDrawActive(state),
             )
         }
     }
 
     override fun tick() {
         ageTicks += 1f
+        prevElytraWeight = elytraWeight
+        elytraWeight = ElytraFirstPersonPose.stepWeight(
+            elytraWeight,
+            player.isFallFlying && HexAnimeClientConfig.config.elytraFirstPerson,
+        )
         observeHeldItems()
         for (state in hands.values) {
             if (state.remoteAim && state.activeAim &&
@@ -150,6 +204,29 @@ class CastItemAnimation(
             val mishapNow = isPulseActive(state) && state.pulseKind == CastPulseKind.MISHAP
             if (state.mishapWasActive && !mishapNow) state.fatigueStartTick = ageTicks
             state.mishapWasActive = mishapNow
+            state.prevResonance = state.resonance
+            state.prevStrokeBlend = state.strokeBlend
+            val strokeTarget = if (state.strokeDrawing && HexAnimeClientConfig.config.liveStrokeMirroring) 1f else 0f
+            state.strokeBlend = Mth.lerp(0.35f, state.strokeBlend, strokeTarget)
+            if (strokeTarget == 0f && state.strokeBlend < 0.01f) state.strokeBlend = 0f
+            val castPulseActive = isPulseActive(state) && state.pulseKind == CastPulseKind.CAST
+            val targetResonance = when {
+                state.activeAim && !state.remoteAim ->
+                    CastResonance.resonanceForCount(state.patternCount, state.comboCount)
+                state.activeAim && state.remoteAim ->
+                    ((ageTicks - state.remoteAimStartTick) / 48f).coerceIn(0f, 0.50f)
+                castPulseActive ->
+                    maxOf(state.resonance, CastResonance.resonanceForCount(state.patternCount, state.comboCount))
+                else -> 0f
+            }
+            state.resonance = CastResonance.step(
+                current = state.resonance,
+                target = targetResonance,
+                active = state.activeAim || castPulseActive,
+            )
+            if (!state.activeAim && !castPulseActive && ageTicks - state.lastCastPulseTick > 60f) {
+                state.comboCount = 0
+            }
             stepAimSpring(state)
         }
     }
@@ -250,11 +327,20 @@ class CastItemAnimation(
         val micro = microPitch(state, phase)
         val fatigue = FatigueCurve.envelope(phase - state.fatigueStartTick)
         val offhandEmpty = player.getItemInHand(hand.opposite()).isEmpty
-        val ritual = if (!offhandEmpty &&
-            profile.animatesAsStaff &&
-            (weight > 0.05f || isPulseActive(state))
-        ) {
-            OffhandRitual.poseFor(player, hand)
+        val resonance = if (config.comboResonance) Mth.lerp(tickDelta, state.prevResonance, state.resonance) else 0f
+        val activePulse = isPulseActive(state)
+        val hasDualCastItem = config.dualWieldSynergy &&
+            !offhandEmpty &&
+            CastItems.snapshot(player.getItemInHand(hand.opposite())) != null
+        val ritual = if ((profile.animatesAsStaff || hasDualCastItem) && (weight > 0.05f || activePulse)) {
+            OffhandRitual.poseFor(
+                player = player,
+                castingHand = hand,
+                resonance = resonance,
+                offhandEnergyEnabled = config.offhandEnergyPose,
+                phase = phase,
+                dualWieldEnabled = config.dualWieldSynergy,
+            )
         } else {
             null
         }
@@ -275,6 +361,50 @@ class CastItemAnimation(
             itemY += drift.second
         }
 
+        val inward = if (Staffs.armBone(player, hand) == Staffs.RIGHT_ARM) -1f else 1f
+        val equip = EquipDrawCurve.evaluate(
+            elapsedTicks = phase - state.equipDrawStartTick,
+            isStaff = state.equipDrawIsStaff,
+            inward = inward,
+            enabled = config.equipFlourish,
+        )
+        val strokeDip = if (config.liveStrokeMirroring && profile.supportsAim) {
+            val pressElapsed = phase - state.strokePressStartTick
+            val pressWave = if (pressElapsed in 0f..5f) {
+                sin((pressElapsed / 5f) * PI.toFloat()) * 0.14f
+            } else {
+                0f
+            }
+            val blend = Mth.lerp(tickDelta, state.prevStrokeBlend, state.strokeBlend)
+            -(blend * 0.13f + pressWave)
+        } else {
+            0f
+        }
+        val loco = LocomotionPose.compute(
+            crouching = player.isCrouching,
+            sprinting = player.isSprinting,
+            airborne = !player.onGround() && !player.isFallFlying,
+            isStaff = profile.animatesAsStaff,
+            resonance = resonance,
+            activeWeight = weight,
+            isPulse = activePulse && state.pulseKind == CastPulseKind.CAST,
+            enabled = config.locomotionCasting,
+        )
+        val dualCounterActive = hasDualCastItem &&
+            activePulse &&
+            state.pulseKind == CastPulseKind.CAST
+        val cypherCompress = !profile.animatesAsStaff &&
+            profile.pulseStyle == PulseStyle.CYPHER &&
+            activePulse &&
+            state.pulseKind == CastPulseKind.CAST &&
+            (!offhandEmpty || config.offhandEnergyPose)
+
+        val levitationScale = maxOf(weight, if (activePulse) 1f else 0f).coerceIn(0f, 1f) * (1f - elytraWeight)
+        val levitation = CastResonance.levitationOffset(resonance, phase, config.comboResonance) * levitationScale
+        val allowOffhand = !offhandEmpty || ritual != null || cypherCompress || state.pulseKind == CastPulseKind.MISHAP
+        val offhandCounterYaw = if (dualCounterActive) -pulse.armYaw * 0.72f else if (cypherCompress) inward * 0.24f else 0f
+        val offhandCounterPitch = if (dualCounterActive) -0.45f * abs(pulse.armPitch) + pulse.armPitch * 0.55f else if (cypherCompress) -0.34f else 0f
+        val offhandCounterRoll = if (dualCounterActive) -pulse.armRoll * 0.68f else 0f
         return CastHandFrame(
             profile = profile,
             motion = pulse.motion,
@@ -284,43 +414,46 @@ class CastItemAnimation(
             aimRoll = 0f,
             bodyYawDelta = pulse.bodyYaw + (tremor.yaw + chaos.yaw) * 0.22f,
             bodyPitchDelta = pulse.bodyPitch + damage * profile.damage.pitchDroop * 0.32f +
-                fatigue * FatigueCurve.BODY_DROOP,
+                fatigue * FatigueCurve.BODY_DROOP + loco.bodyPitch,
             bodyRollDelta = pulse.bodyRoll + (tremor.roll + chaos.roll) * 0.18f,
             bodyXDelta = pulse.bodyX,
-            bodyYDelta = pulse.bodyY,
+            bodyYDelta = pulse.bodyY - levitation + loco.bodyY,
             bodyZDelta = pulse.bodyZ,
             headYawDelta = pulse.headYaw - (tremor.yaw + chaos.yaw) * 0.32f,
             headPitchDelta = pulse.headPitch - (tremor.pitch + chaos.pitch) * 0.24f +
                 fatigue * FatigueCurve.HEAD_DROOP,
             headRollDelta = pulse.headRoll - (tremor.roll + chaos.roll) * 0.42f,
             leftLegYawDelta = pulse.leftLegYaw,
-            leftLegPitchDelta = pulse.leftLegPitch,
+            leftLegPitchDelta = pulse.leftLegPitch + loco.legPitch,
             leftLegRollDelta = pulse.leftLegRoll,
             rightLegYawDelta = pulse.rightLegYaw,
-            rightLegPitchDelta = pulse.rightLegPitch,
+            rightLegPitchDelta = pulse.rightLegPitch + loco.legPitch,
             rightLegRollDelta = pulse.rightLegRoll,
             armYawDelta = pulse.armYaw + tremor.yaw + chaos.yaw,
             armPitchDelta = pulse.armPitch + tremor.pitch + chaos.pitch +
-                damage * profile.damage.pitchDroop + fatigue * FatigueCurve.ARM_DROOP,
-            armRollDelta = pulse.armRoll + tremor.roll + chaos.roll,
+                damage * profile.damage.pitchDroop + fatigue * FatigueCurve.ARM_DROOP +
+                loco.armPitch + equip.armPitch + strokeDip,
+            armRollDelta = pulse.armRoll + tremor.roll + chaos.roll + loco.armRoll + equip.armRoll,
             itemYawDelta = pulse.itemYaw + (tremor.yaw + chaos.yaw) * 0.82f,
             itemPitchDelta = pulse.itemPitch + (tremor.pitch + chaos.pitch) * 0.82f + micro +
-                fatigue * FatigueCurve.ITEM_DROOP,
-            itemRollDelta = pulse.itemRoll + (tremor.roll + chaos.roll) * 1.35f,
+                fatigue * FatigueCurve.ITEM_DROOP + equip.itemPitch + strokeDip * 1.15f,
+            itemRollDelta = pulse.itemRoll + (tremor.roll + chaos.roll) * 1.35f + equip.itemRoll,
             itemXDelta = itemX,
-            itemYDelta = itemY,
+            itemYDelta = itemY + equip.itemY,
             itemZDelta = itemZ,
-            offhandYawDelta = if (offhandEmpty) 0f else pulse.offhandYaw + (ritual?.yaw ?: 0f) * ritualWeight,
-            offhandPitchDelta = if (offhandEmpty) 0f else pulse.offhandPitch + (ritual?.pitch ?: 0f) * ritualWeight,
-            offhandRollDelta = if (offhandEmpty) 0f else pulse.offhandRoll + (ritual?.roll ?: 0f) * ritualWeight,
+            offhandYawDelta = if (!allowOffhand) 0f else pulse.offhandYaw + (ritual?.yaw ?: 0f) * ritualWeight + offhandCounterYaw,
+            offhandPitchDelta = if (!allowOffhand) 0f else pulse.offhandPitch + (ritual?.pitch ?: 0f) * ritualWeight + offhandCounterPitch,
+            offhandRollDelta = if (!allowOffhand) 0f else pulse.offhandRoll + (ritual?.roll ?: 0f) * ritualWeight + offhandCounterRoll,
             firstPersonYaw = pulse.firstPersonYaw,
-            firstPersonPitch = pulse.firstPersonPitch + micro + fatigue * FatigueCurve.ITEM_DROOP,
-            firstPersonRoll = pulse.firstPersonRoll,
+            firstPersonPitch = pulse.firstPersonPitch + micro + fatigue * FatigueCurve.ITEM_DROOP +
+                equip.firstPersonPitch + strokeDip * 0.6f,
+            firstPersonRoll = pulse.firstPersonRoll + equip.firstPersonRoll,
             firstPersonX = pulse.firstPersonX,
-            firstPersonY = pulse.firstPersonY,
+            firstPersonY = pulse.firstPersonY + equip.firstPersonY,
             firstPersonZ = pulse.firstPersonZ,
             strain = strain,
             breakWave = pulse.breakWave,
+            resonance = resonance,
         ).limitTagged()
     }
 
@@ -370,14 +503,16 @@ class CastItemAnimation(
         value0: Vec3f,
     ): Vec3f {
         val firstPerson = isLocalFirstPerson()
+        val elytra = if (firstPerson) elytraPose(tickDelta) else ElytraFirstPersonPose.Result.ZERO
         val (rotScale, posScale) = localFirstPersonScales()
         if (modelName == BODY || modelName == HEAD) {
             val frames = hands.keys.map { frame(it, tickDelta) }
             if (type == TransformType.POSITION && modelName == BODY) {
+                val bodyPosScale = posScale * (1f - 0.75f * elytra.weight)
                 return Vec3f(
-                    value0.x + frames.sumOf { it.bodyXDelta.toDouble() }.toFloat() * posScale,
-                    value0.y + frames.sumOf { it.bodyYDelta.toDouble() }.toFloat() * posScale,
-                    value0.z + frames.sumOf { it.bodyZDelta.toDouble() }.toFloat() * posScale,
+                    value0.x + frames.sumOf { it.bodyXDelta.toDouble() }.toFloat() * bodyPosScale,
+                    value0.y + frames.sumOf { it.bodyYDelta.toDouble() }.toFloat() * bodyPosScale,
+                    value0.z + frames.sumOf { it.bodyZDelta.toDouble() }.toFloat() * bodyPosScale,
                 )
             }
             if (type != TransformType.ROTATION) return value0
@@ -427,10 +562,12 @@ class CastItemAnimation(
                     }
                 }
                 val itemScale = if (firstPerson) FIRST_PERSON_ITEM_POSITION_SCALE else posScale
+                val elytraY = if (firstPerson) elytra.verticalOffset * 16f else 0f
+                val elytraZ = if (firstPerson) elytra.forwardOffset * 16f else 0f
                 Vec3f(
                     value0.x + frame.itemXDelta * itemScale,
-                    value0.y + frame.itemYDelta * itemScale,
-                    value0.z + itemZ * itemScale,
+                    value0.y + frame.itemYDelta * itemScale + elytraY,
+                    value0.z + itemZ * itemScale + elytraZ,
                 )
             } else {
                 value0
@@ -445,9 +582,9 @@ class CastItemAnimation(
         return if (bone.item) {
             val itemScale = if (firstPerson) FIRST_PERSON_ITEM_ROTATION_SCALE else rotScale
             Vec3f(
-                x + frame.itemPitchDelta * itemScale,
+                x + frame.itemPitchDelta * itemScale + elytra.pitchOffset,
                 y + frame.itemYawDelta * itemScale,
-                z + frame.itemRollDelta * itemScale,
+                z + frame.itemRollDelta * itemScale + elytra.rollOffset,
             )
         } else {
             Vec3f(
@@ -498,8 +635,10 @@ class CastItemAnimation(
                 profile.supportsAim &&
                 (state.activeAim || state.weight > 0.01f)
         }
+        val equipDrawOnly = hands.values.none { isPulseActive(it) } &&
+            hands.values.any { equipDrawActive(it) }
         return when {
-            staffAimVisible -> FirstPersonMode.NONE
+            staffAimVisible || equipDrawOnly -> FirstPersonMode.NONE
             HexAnimeClientConfig.config.firstPersonAnimations -> FirstPersonMode.THIRD_PERSON_MODEL
             else -> FirstPersonMode.DISABLED
         }
@@ -513,9 +652,29 @@ class CastItemAnimation(
         return isPulseActive(state) && state.pulseKind == CastPulseKind.MISHAP
     }
 
+    fun isEquipDrawActive(hand: InteractionHand): Boolean =
+        equipDrawActive(hands.getValue(hand))
+
     private fun refreshHeldItem(hand: InteractionHand, state: HandState) {
-        val snapshot = CastItems.snapshot(player.getItemInHand(hand))
+        val heldStack = player.getItemInHand(hand)
+        val currentItem = if (heldStack.isEmpty) null else heldStack.item
+        val selectedSlot = if (hand == InteractionHand.MAIN_HAND) player.inventory.selected else -1
+        val itemChanged = state.observedInitialized &&
+            (currentItem !== state.lastObservedItem || (hand == InteractionHand.MAIN_HAND && selectedSlot != state.lastObservedSlot))
+        state.observedInitialized = true
+        state.lastObservedItem = currentItem
+        state.lastObservedSlot = selectedSlot
+
+        val snapshot = CastItems.snapshot(heldStack)
         if (snapshot != null) {
+            if (itemChanged &&
+                HexAnimeClientConfig.config.equipFlourish &&
+                !isCastingContext(state) &&
+                !isPulseActive(state)
+            ) {
+                state.equipDrawStartTick = ageTicks
+                state.equipDrawIsStaff = snapshot.profile.animatesAsStaff
+            }
             val damageJump = state.hasSample && snapshot.damageValue > state.lastDamageValue
             val mediaDrop = state.hasSample &&
                 state.lastMediaFullness >= 0f &&
@@ -589,6 +748,16 @@ class CastItemAnimation(
             return
         }
         if (kind == CastPulseKind.CAST) {
+            state.comboCount = if (ageTicks - state.lastCastPulseTick <= 55f) {
+                (state.comboCount + 1).coerceAtMost(8)
+            } else {
+                1
+            }
+            state.lastCastPulseTick = ageTicks
+            state.resonance = maxOf(
+                state.resonance,
+                CastResonance.resonanceForCount(state.patternCount, state.comboCount),
+            )
             state.castOrdinal += 1
             state.legMotionAllowed = LegMotionCadence.shouldAnimate(state.castOrdinal)
         } else {
@@ -647,7 +816,18 @@ class CastItemAnimation(
             envelope * motion.bodyPitch - breakWave * 0.12f
         }
 
-        val legScale = if (state.legMotionAllowed) 1f else 0f
+        val sprintSuppressLegs = HexAnimeClientConfig.config.locomotionCasting &&
+            player.isSprinting &&
+            state.pulseProfile?.animatesAsStaff == false
+        val legScale = if (state.legMotionAllowed && elytraWeight < 0.25f && !sprintSuppressLegs) 1f else 0f
+        val cypherBreakThrow = state.pulseKind == CastPulseKind.BREAK &&
+            HexAnimeClientConfig.config.orbitalItemMotions &&
+            state.pulseProfile?.animatesAsStaff == false
+        val breakSign = if (state.pulseVariant % 2 == 0) 1f else -1f
+        val breakThrowY = if (cypherBreakThrow) -t * 0.16f else 0f
+        val breakThrowZ = if (cypherBreakThrow) -t * 0.48f else 0f
+        val breakThrowPitch = if (cypherBreakThrow) -t * 2.2f else 0f
+        val breakThrowRoll = if (cypherBreakThrow) t * 3.4f * breakSign else 0f
         return PulseMotion(
             motion = motion,
             bodyYaw = envelope * motion.bodyYaw + chaos,
@@ -669,11 +849,11 @@ class CastItemAnimation(
             armPitch = envelope * motion.armPitch - breakWave * 0.10f,
             armRoll = envelope * motion.armRoll + chaos,
             itemYaw = envelope * motion.itemYaw,
-            itemPitch = envelope * motion.itemPitch - breakWave * 0.19f,
-            itemRoll = envelope * motion.itemRoll + chaos * 1.5f,
+            itemPitch = envelope * motion.itemPitch - breakWave * 0.19f + breakThrowPitch,
+            itemRoll = envelope * motion.itemRoll + chaos * 1.5f + breakThrowRoll,
             itemX = envelope * motion.itemX,
-            itemY = -envelope * motion.itemY,
-            itemZ = envelope * motion.itemZ,
+            itemY = -envelope * motion.itemY + breakThrowY,
+            itemZ = envelope * motion.itemZ + breakThrowZ,
             offhandYaw = envelope * motion.offhandYaw,
             offhandPitch = envelope * motion.offhandPitch + breakWave * 0.08f,
             offhandRoll = envelope * motion.offhandRoll - chaos,
@@ -698,7 +878,12 @@ class CastItemAnimation(
         val motion = profile.itemCastMotion
             ?: ItemCastMotion.forVariant(state.pulseVariant)
         val inward = if (Staffs.armBone(player, hand) == Staffs.RIGHT_ARM) -1f else 1f
-        val floating = ItemFloatMotions.pose(motion, t, inward) ?: return this
+        val floating = ItemFloatMotions.pose(
+            motion = motion,
+            tickProgress = t,
+            inward = inward,
+            orbitalEnabled = HexAnimeClientConfig.config.orbitalItemMotions,
+        ) ?: return this
         val weight = floating.weight
         val (itemX, itemY, itemZ) = floating.firstPersonOffset()
         return copy(
@@ -817,7 +1002,10 @@ class CastItemAnimation(
                 lerp(0f, -WINDUP_WEIGHT, k)
             }
             t < release -> {
-                val k = smoothStep((t - anticipation) / (release - anticipation))
+                var k = smoothStep((t - anticipation) / (release - anticipation))
+                if (state.pulseProfile?.staffMaterial == StaffMaterial.QUENCHED && kind == CastPulseKind.CAST) {
+                    k = smoothStep(k)
+                }
                 lerp(-WINDUP_WEIGHT, 1f, k)
             }
             t < hold -> {
@@ -838,7 +1026,8 @@ class CastItemAnimation(
         }
         val style = stateStyle(state)
         val kindScale = when (kind) {
-            CastPulseKind.CAST -> style.castScale
+            CastPulseKind.CAST -> style.castScale *
+                CastResonance.pulseAmplitudeScale(state.resonance, HexAnimeClientConfig.config.comboResonance)
             CastPulseKind.BREAK -> motion.breakScale() * style.breakScale
             CastPulseKind.DAMAGE -> 0.58f
             CastPulseKind.MISHAP -> 1.85f
@@ -874,6 +1063,10 @@ class CastItemAnimation(
 
     private fun fatigueActive(state: HandState): Boolean =
         FatigueCurve.envelope(ageTicks - state.fatigueStartTick) > 0f
+
+    private fun equipDrawActive(state: HandState): Boolean =
+        HexAnimeClientConfig.config.equipFlourish &&
+            ageTicks - state.equipDrawStartTick in 0f..EquipDrawCurve.DURATION_TICKS
 
     private fun overcastNow(phase: Float): Float =
         OvercastStrain.remaining(overcastInitial, phase - overcastStartTick)
@@ -974,6 +1167,21 @@ class CastItemAnimation(
         var microStartTick: Float = -10_000f,
         var mishapWasActive: Boolean = false,
         var fatigueStartTick: Float = -10_000f,
+        var patternCount: Int = 0,
+        var comboCount: Int = 0,
+        var lastCastPulseTick: Float = -10_000f,
+        var resonance: Float = 0f,
+        var prevResonance: Float = 0f,
+        var remoteAimStartTick: Float = -10_000f,
+        var lastObservedItem: net.minecraft.world.item.Item? = null,
+        var lastObservedSlot: Int = -1,
+        var observedInitialized: Boolean = false,
+        var equipDrawStartTick: Float = -10_000f,
+        var equipDrawIsStaff: Boolean = false,
+        var strokeDrawing: Boolean = false,
+        var strokeBlend: Float = 0f,
+        var prevStrokeBlend: Float = 0f,
+        var strokePressStartTick: Float = -10_000f,
     )
 
     private data class BoneRef(val hand: InteractionHand, val item: Boolean)
@@ -1124,6 +1332,7 @@ data class CastHandFrame(
     val firstPersonZ: Float,
     val strain: Float,
     val breakWave: Float,
+    val resonance: Float = 0f,
 ) {
     val hasMotion: Boolean
         get() = aimWeight > 0.001f ||

@@ -76,4 +76,13 @@ class ItemFloatMotionsTest {
         assertTrue(target.y in -0.3f..-0.1f)
         assertTrue(target.z in -0.55f..-0.35f)
     }
+
+    @Test
+    fun orbitalChestFloatSweepsInAnArcAroundCenter() {
+        val early = ItemFloatMotions.pose(ItemCastMotion.CHEST_HOVER, 0.25f, 1f, orbitalEnabled = true)!!
+        val mid = ItemFloatMotions.pose(ItemCastMotion.CHEST_HOVER, 0.50f, 1f, orbitalEnabled = true)!!
+        val late = ItemFloatMotions.pose(ItemCastMotion.CHEST_HOVER, 0.75f, 1f, orbitalEnabled = true)!!
+        assertTrue(early.itemZ < mid.itemZ && late.itemZ > mid.itemZ)
+        assertTrue(mid.itemX > early.itemX)
+    }
 }

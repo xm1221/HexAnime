@@ -10,6 +10,9 @@ import cn.xm1221.hexanime.client.anim.CastAnimationTuning
 import cn.xm1221.hexanime.client.anim.CastHandFrame
 import cn.xm1221.hexanime.client.anim.CastItemAnimation
 import cn.xm1221.hexanime.client.anim.CastItemLayer
+import cn.xm1221.hexanime.client.anim.ElytraFirstPersonPose
+import cn.xm1221.hexanime.client.vfx.ArcaneGeometryRenderer
+import cn.xm1221.hexanime.client.vfx.MaterialFeedbackClient
 import cn.xm1221.hexanime.config.HexAnimeClientConfig
 import cn.xm1221.hexanime.networking.msg.MsgCastPulseS2C
 import cn.xm1221.hexanime.networking.msg.MsgOvercastStrainS2C
@@ -31,12 +34,15 @@ object CastAnimationClient {
         ) { player -> CastItemLayer(player) }
         AnimationPreferencesClient.init()
         MishapScreenEffectClient.init()
+        ArcaneGeometryRenderer.init()
         CursorSampler.init()
         ClientTickEvent.CLIENT_POST.register { minecraft ->
             minecraft.level?.players()?.forEach { player ->
                 animation(player)?.observeHeldItems()
             }
             StaffTipParticles.tick(minecraft)
+            CameraShakeClient.tickAim(minecraft)
+            ArcaneGeometryRenderer.tick(minecraft)
         }
         HexAnime.LOGGER.info("Registered cast-item animation layer {}", LAYER_ID)
     }
@@ -86,13 +92,27 @@ object CastAnimationClient {
         if (!HexAnimeClientConfig.config.receiveRemoteEvents && !isSelf) return
         val profile = CastItemProfiles.byId(msg.profileId) ?: return
         val kind = CastPulseKind.fromNetwork(msg.kind) ?: return
-        animation(entity)?.triggerPulse(
+        val anim = animation(entity)
+        anim?.triggerPulse(
             hand = msg.hand,
             profile = profile,
             variant = msg.variant,
             strain = msg.strain,
             kind = kind,
         )
+        val resonance = anim?.maxResonance(1f) ?: 0f
+        MaterialFeedbackClient.onPulse(
+            player = entity,
+            hand = msg.hand,
+            profile = profile,
+            variant = msg.variant,
+            strain = msg.strain,
+            kind = kind,
+            resonance = resonance,
+        )
+        if (kind == CastPulseKind.MISHAP) {
+            ArcaneGeometryRenderer.triggerShatter(entity, MishapFlavor.fromVariant(msg.variant))
+        }
         if (isSelf) {
             CastItemActivation.show(msg.displayStack, profile, kind, msg.strain)
             if (kind == CastPulseKind.MISHAP) {
@@ -101,10 +121,9 @@ object CastAnimationClient {
                     msg.forceScreenEffect,
                 )
             }
-            CameraShakeClient.trigger(kind)
+            CameraShakeClient.trigger(kind, msg.variant, resonance)
         }
     }
-
 
     fun frame(player: AbstractClientPlayer, hand: InteractionHand, partialTick: Float): CastHandFrame =
         animation(player)?.frame(hand, partialTick) ?: CastHandFrame.EMPTY
@@ -112,11 +131,19 @@ object CastAnimationClient {
     fun isMishapActive(player: AbstractClientPlayer, hand: InteractionHand): Boolean =
         animation(player)?.isMishapActive(hand) == true
 
+    fun isEquipDrawActive(player: AbstractClientPlayer, hand: InteractionHand): Boolean =
+        animation(player)?.isEquipDrawActive(hand) == true
+
+    fun resonanceOf(player: AbstractClientPlayer, partialTick: Float): Float =
+        animation(player)?.maxResonance(partialTick) ?: 0f
+
+    fun elytraPose(player: AbstractClientPlayer, partialTick: Float): ElytraFirstPersonPose.Result =
+        animation(player)?.elytraPose(partialTick) ?: ElytraFirstPersonPose.Result.ZERO
+
     fun animationOf(player: AbstractClientPlayer): CastItemAnimation? = animation(player)
 
     private fun animation(player: AbstractClientPlayer): CastItemAnimation? {
         val found = PlayerAnimationAccess.getPlayerAssociatedData(player).get(LAYER_ID)
         return (found as? CastItemLayer)?.animation
     }
-
 }

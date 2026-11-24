@@ -9,12 +9,14 @@ internal object CastItemActivity {
         hasMicroPulse: Boolean,
         hasFatigue: Boolean,
         overcastStrain: Float,
+        hasEquipDraw: Boolean = false,
     ): Boolean {
         if (!enabled) return false
         return hasAim ||
             hasPulse ||
             hasMicroPulse ||
             hasFatigue ||
+            hasEquipDraw ||
             overcastStrain > 0f
     }
 }

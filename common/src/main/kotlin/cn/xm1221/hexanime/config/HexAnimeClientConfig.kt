@@ -67,6 +67,45 @@ object HexAnimeClientConfig {
         var staffTipParticles: Boolean = true
 
         @Tooltip
+        var cameraRollAndFov: Boolean = true
+
+        @Tooltip
+        var comboResonance: Boolean = true
+
+        @Tooltip
+        var offhandEnergyPose: Boolean = true
+
+        @Tooltip
+        var materialVfxAndAudio: Boolean = true
+
+        @Tooltip
+        var arcaneCircleAndTrail: Boolean = true
+
+        @Tooltip
+        var circleHexPatterns: Boolean = true
+
+        @Tooltip
+        var expandingMagicCircle: Boolean = true
+
+        @Tooltip
+        var elytraFirstPerson: Boolean = true
+
+        @Tooltip
+        var equipFlourish: Boolean = true
+
+        @Tooltip
+        var orbitalItemMotions: Boolean = true
+
+        @Tooltip
+        var liveStrokeMirroring: Boolean = true
+
+        @Tooltip
+        var locomotionCasting: Boolean = true
+
+        @Tooltip
+        var dualWieldSynergy: Boolean = true
+
+        @Tooltip
         var mindspliceHeadPitch: Double = -0.28
 
         @Tooltip

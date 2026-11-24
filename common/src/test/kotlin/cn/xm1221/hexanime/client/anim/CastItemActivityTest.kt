@@ -17,6 +17,17 @@ class CastItemActivityTest {
                 overcastStrain = 0.8f,
             ),
         )
+        assertTrue(
+            CastItemActivity.shouldRun(
+                enabled = true,
+                hasAim = false,
+                hasPulse = false,
+                hasMicroPulse = false,
+                hasFatigue = false,
+                overcastStrain = 0f,
+                hasEquipDraw = true,
+            ),
+        )
     }
 
     @Test

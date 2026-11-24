@@ -31,6 +31,7 @@ object StaffPatternClient {
         if (!snapshot.profile.animatesAsStaff) return
 
         val animation = CastAnimationClient.animationOf(player) ?: return
+        animation.recordPatternSuccess(hand)
         animation.triggerMicroPulse(hand)
         val server = HexAnimeServerConfig.config
         if (stackClear && server.enabled && server.staffPulse) {

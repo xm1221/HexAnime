@@ -2,6 +2,7 @@ package cn.xm1221.hexanime.client.anim
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -27,7 +28,7 @@ class FatigueAndPoseTest {
     }
 
     @Test
-    fun offhandKindsMatchTheReviewedItems() {
+    fun offhandKindsSupportMediaAndResonantEmptyHand() {
         assertEquals(OffhandRitual.Kind.EMPTY, OffhandRitual.classify(true, "minecraft", "air"))
         assertEquals(
             OffhandRitual.Kind.PATCHOULI,
@@ -38,15 +39,23 @@ class FatigueAndPoseTest {
             OffhandRitual.classify(false, "hexcasting", "lore_fragment"),
         )
         assertEquals(
-            OffhandRitual.Kind.OTHER,
-            OffhandRitual.classify(false, "minecraft", "stick"),
+            OffhandRitual.Kind.HEX_MEDIA,
+            OffhandRitual.classify(false, "hexcasting", "cypher"),
+        )
+        assertEquals(
+            OffhandRitual.Kind.HEX_MEDIA,
+            OffhandRitual.classify(false, "hexcasting", "focus"),
         )
         assertEquals(
             OffhandRitual.Kind.OTHER,
-            OffhandRitual.classify(false, "hexcasting", "cypher"),
+            OffhandRitual.classify(false, "minecraft", "stick"),
         )
         assertNull(OffhandRitual.pose(OffhandRitual.Kind.EMPTY))
-        assertTrue(OffhandRitual.pose(OffhandRitual.Kind.LORE) != null)
+        assertNotNull(OffhandRitual.pose(OffhandRitual.Kind.EMPTY, resonance = 0.5f, offhandEnergyEnabled = true))
+        assertNull(OffhandRitual.pose(OffhandRitual.Kind.EMPTY, resonance = 0.5f, offhandEnergyEnabled = false))
+        assertNotNull(OffhandRitual.pose(OffhandRitual.Kind.HEX_MEDIA))
+        assertNotNull(OffhandRitual.pose(OffhandRitual.Kind.DUAL_CAST_ITEM))
+        assertNotNull(OffhandRitual.pose(OffhandRitual.Kind.LORE))
         assertNull(OffhandRitual.pose(OffhandRitual.Kind.OTHER))
     }
 

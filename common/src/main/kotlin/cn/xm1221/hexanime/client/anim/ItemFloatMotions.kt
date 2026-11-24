@@ -2,6 +2,7 @@ package cn.xm1221.hexanime.client.anim
 
 import cn.xm1221.hexanime.casting.item.ItemCastMotion
 import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.sin
 
 data class ItemFloatPose(
@@ -35,7 +36,12 @@ object ItemFloatMotions {
     private const val EDGE = 0.16f
     private const val FULL_TURN = 2f * PI.toFloat()
 
-    fun pose(motion: ItemCastMotion, tickProgress: Float, inward: Float): ItemFloatPose? {
+    fun pose(
+        motion: ItemCastMotion,
+        tickProgress: Float,
+        inward: Float,
+        orbitalEnabled: Boolean = true,
+    ): ItemFloatPose? {
         if (tickProgress <= START || tickProgress >= END) return null
         val progress = ((tickProgress - START) / (END - START)).coerceIn(0f, 1f)
         val weight = when {
@@ -43,9 +49,13 @@ object ItemFloatMotions {
             progress > 1f - EDGE -> smoothStep((1f - progress) / EDGE)
             else -> 1f
         }
-        val spin = smoothStep(progress) * FULL_TURN
+        val spin = smoothStep(hitstopProgress(progress, orbitalEnabled)) * FULL_TURN
         val wave = sin(progress * PI * 2f).toFloat()
         val side = inward.coerceIn(-1f, 1f)
+        val orbitAngle = (progress - 0.5f) * PI.toFloat() * 1.35f
+        val orbitX = if (orbitalEnabled) 0.38f + 0.18f * cos(orbitAngle) else 0.56f
+        val orbitZ = if (orbitalEnabled) 0.14f * sin(orbitAngle) else 0f
+        val orbitY = if (orbitalEnabled) 0.06f * sin(progress * PI.toFloat()) else 0f
 
         return when (motion) {
             ItemCastMotion.ARM_FLIGHT -> ItemFloatPose(
@@ -65,12 +75,12 @@ object ItemFloatMotions {
                 armYaw = side * 0.42f,
                 armPitch = -0.92f,
                 armRoll = side * 0.16f,
-                itemYaw = side * 0.04f,
+                itemYaw = side * (0.04f + (if (orbitalEnabled) 0.18f * sin(orbitAngle) else 0f)),
                 itemPitch = 0.12f + wave * 0.05f,
                 itemRoll = side * 0.05f + wave * 0.06f,
-                itemX = side * 0.56f,
-                itemY = 0.28f + wave * 0.03f,
-                itemZ = 0.26f,
+                itemX = side * orbitX,
+                itemY = 0.28f + wave * 0.03f + orbitY,
+                itemZ = 0.26f + orbitZ,
             )
             ItemCastMotion.CHEST_SPIN -> ItemFloatPose(
                 weight = weight,
@@ -80,9 +90,9 @@ object ItemFloatMotions {
                 itemYaw = spin,
                 itemPitch = wave * 0.04f,
                 itemRoll = side * 0.10f,
-                itemX = side * 0.54f,
-                itemY = 0.26f + wave * 0.03f,
-                itemZ = 0.24f,
+                itemX = side * (orbitX - 0.02f),
+                itemY = 0.26f + wave * 0.03f + orbitY,
+                itemZ = 0.24f + orbitZ,
             )
             ItemCastMotion.HAND_THRUST -> {
                 val rollAlign = smoothStep((progress / 0.22f).coerceIn(0f, 1f)) *
@@ -104,6 +114,13 @@ object ItemFloatMotions {
                 )
             }
         }
+    }
+
+    /** Subtle climax hesitation near progress = 0.50 so orbital spins snap with crisp emphasis. */
+    private fun hitstopProgress(progress: Float, enabled: Boolean): Float {
+        if (!enabled) return progress
+        val delta = progress - 0.5f
+        return (progress - sin(delta * PI.toFloat() * 2f) * 0.035f).coerceIn(0f, 1f)
     }
 
     private fun smoothStep(value: Float): Float {

@@ -46,6 +46,58 @@
             "": "Staff tip particles",
             "@Tooltip": "Shows a few pigment-colored motes at the staff tip while overcast strain is high.",
           },
+          cameraRollAndFov: {
+            "": "Camera roll & FOV kick",
+            "@Tooltip": "Adds subtle FOV focus/burst pulses and camera roll on sweeping casts and mishaps.",
+          },
+          comboResonance: {
+            "": "Escalating cast resonance",
+            "@Tooltip": "Builds posture intensity and levitation poise as you chain patterns or artifact casts.",
+          },
+          offhandEnergyPose: {
+            "": "Offhand energy & focus pose",
+            "@Tooltip": "Raises an empty or focus-bearing offhand into a channeling gesture during casting.",
+          },
+          materialVfxAndAudio: {
+            "": "Material VFX & audio",
+            "@Tooltip": "Adds staff-material particles, crystal/psychic accents, and instant mishap shatter bursts.",
+          },
+          arcaneCircleAndTrail: {
+            "": "3D arcane circle & trail",
+            "@Tooltip": "Renders a lightweight pigment-colored geometric ring at your feet and a staff-tip ribbon trail.",
+          },
+          circleHexPatterns: {
+            "": "Hex patterns in circle",
+            "@Tooltip": "Projects drawn Hex patterns inside the 3D magic circle.",
+          },
+          expandingMagicCircle: {
+            "": "Expanding multi-ring circle",
+            "@Tooltip": "Unfurls multiple concentric rings up to 10+ blocks wide as you draw more patterns.",
+          },
+          elytraFirstPerson: {
+            "": "Elytra first-person casting",
+            "@Tooltip": "Keeps first-person staff and packaged-Hex animations smooth and unclipped while gliding.",
+          },
+          equipFlourish: {
+            "": "Equip draw flourish",
+            "@Tooltip": "Plays a quick twirl or catch motion when switching to a staff or packaged Hex item.",
+          },
+          orbitalItemMotions: {
+            "": "Orbital item choreography",
+            "@Tooltip": "Gives hovering artifacts and trinkets an elliptical orbit with a climax pause.",
+          },
+          liveStrokeMirroring: {
+            "": "Live stroke mirroring",
+            "@Tooltip": "Dips and flicks the staff in sync with dragging strokes on the spell grid.",
+          },
+          locomotionCasting: {
+            "": "Locomotion-aware stances",
+            "@Tooltip": "Adapts casting posture while sneaking, airborne, or sprinting.",
+          },
+          dualWieldSynergy: {
+            "": "Dual-wield synergy",
+            "@Tooltip": "Coordinates the offhand item in a cross-guard or counter-swing when dual-wielding.",
+          },
           mindspliceHeadPitch: {
             "": "Mindsplice nod",
             "@Tooltip": "Extra head pitch, in radians, at the peak of a mindsplice finishing flourish. Default -0.28.",

@@ -6,6 +6,7 @@
   "client": [
     "client.CameraAccessor",
     "client.CameraMixin",
+    "client.GameRendererMixin",
     "client.GuiSpellcastingAccessor",
     "client.ItemInHandRendererMixin",
     "client.MsgNewSpellPatternMixin"

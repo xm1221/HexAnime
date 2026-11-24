@@ -70,6 +70,10 @@ object CursorSampler {
             hand,
             state,
         )
+        CastAnimationClient.animationOf(player)?.setStrokeDrawing(
+            hand,
+            HexAnimeClientConfig.config.enabled && GuiSpellcastingState.isDrawing(gui),
+        )
 
         if (!HexAnimeClientConfig.config.syncToServer) {
             if (lastSentActive) {
@@ -92,6 +96,7 @@ object CursorSampler {
     private fun stop(player: AbstractClientPlayer, hand: InteractionHand = lastHand) {
         if (!casting) return
         casting = false
+        CastAnimationClient.animationOf(player)?.setStrokeDrawing(hand, false)
         CastAnimationClient.apply(player, false, lastX, lastY, hand, lastState)
         send(false, lastX, lastY, hand, force = true)
     }
